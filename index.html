@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jamaree Gas</title>
+<style>
+  :root {
+    --primary: #ff6b35;
+    --primary-dark: #e8551f;
+    --bg: #fff8f5;
+    --text: #2b2b2b;
+    --muted: #6b6b6b;
+    --card-bg: #ffffff;
+    --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", Sarabun, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .hero {
+    text-align: center;
+    padding: 64px 24px 48px;
+    background: linear-gradient(180deg, #fff1e8 0%, var(--bg) 100%);
+  }
+
+  .hero h1 {
+    font-size: clamp(2.2rem, 8vw, 3.4rem);
+    font-weight: 800;
+    color: var(--primary);
+    letter-spacing: -0.02em;
+  }
+
+  .hero p {
+    margin-top: 14px;
+    font-size: clamp(1rem, 3.5vw, 1.25rem);
+    color: var(--muted);
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    padding: 8px 0 56px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 32px 24px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.12);
+  }
+
+  .card .icon {
+    font-size: 2.6rem;
+    margin-bottom: 14px;
+  }
+
+  .card h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .card p {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .cta {
+    text-align: center;
+    padding: 24px 20px 80px;
+  }
+
+  .cta-btn {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    font-size: 1.15rem;
+    font-weight: 700;
+    padding: 18px 48px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(255,107,53,0.35);
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+
+  .cta-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+  }
+
+  .cta-btn:active {
+    transform: translateY(0);
+  }
+
+  .cta-msg {
+    margin-top: 18px;
+    font-size: 1rem;
+    color: var(--primary-dark);
+    font-weight: 600;
+    min-height: 1.4em;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .cta-msg.show {
+    opacity: 1;
+  }
+
+  footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+
+  <section class="hero">
+    <h1>Jamaree Gas</h1>
+    <p>บริการแก๊สหุงต้มและติดตั้งอุปกรณ์แก๊สครบวงจร ส่งไว ปลอดภัย ไว้ใจได้</p>
+  </section>
+
+  <main>
+    <section class="cards">
+      <div class="card">
+        <div class="icon">🚚</div>
+        <h3>ส่งไว ตรงเวลา</h3>
+        <p>สั่งวันนี้ ได้ของไว จัดส่งถึงหน้าบ้านทันที</p>
+      </div>
+      <div class="card">
+        <div class="icon">🛡️</div>
+        <h3>ปลอดภัยได้มาตรฐาน</h3>
+        <p>อุปกรณ์และถังแก๊สผ่านการตรวจสอบคุณภาพทุกขั้นตอน</p>
+      </div>
+      <div class="card">
+        <div class="icon">💰</div>
+        <h3>ราคาย่อมเยา</h3>
+        <p>ราคาชัดเจน คุ้มค่า ไม่มีค่าใช้จ่ายแอบแฝง</p>
+      </div>
+    </section>
+
+    <section class="cta">
+      <button class="cta-btn" onclick="showContactMsg()">ติดต่อเรา</button>
+      <p id="contactMsg" class="cta-msg">เดี๋ยวต่อ LINE ให้ในคลาสถัดไป</p>
+    </section>
+  </main>
+
+  <footer>
+    &copy; 2026 Jamaree Gas
+  </footer>
+
+  <script>
+    function showContactMsg() {
+      var msg = document.getElementById('contactMsg');
+      msg.classList.add('show');
+    }
+  </script>
+
+</body>
+</html>
