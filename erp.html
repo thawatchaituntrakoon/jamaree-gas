@@ -1199,33 +1199,34 @@ function createPoFromLowStock(){
 }
 
 /* ⭐ รับแก๊สดิบด่วน — ทางลัดสำหรับซื้อสดหน้างาน ไม่ผ่านผู้ขาย/PO
-   กรอกน้ำหนักที่รับ+ยอดเงินที่จ่ายจริง ระบบตัดเข้าสต๊อกแก๊สดิบ + ลงบัญชีจ่ายทันที (ไม่ใช่ค้างจ่ายแบบ PO) */
+   กรอกน้ำหนักที่รับ+ราคาแก๊สต่อกิโลตรงๆ (พิมพ์ได้ทั้งคู่) ระบบคูณยอดรวมให้เอง แล้วตัดเข้าสต๊อกแก๊สดิบ + ลงบัญชีจ่ายทันที (ไม่ใช่ค้างจ่ายแบบ PO) */
 function openQuickGasReceive(){
  const raw=db.products.find(p=>p.kind==='ดิบ');
  if(!raw){ alert('ยังไม่มีสินค้าประเภท "แก๊สดิบ" ในระบบ — ไปเพิ่มในแท็บสินค้าก่อน'); return; }
  showFormPage('รับแก๊สดิบด่วน', esc(raw.name)+' — ไม่ผ่านผู้ขาย/PO เหมาะกับซื้อสดหน้างาน', `
   <div class="frow">
    <div class="fld"><label>น้ำหนักที่รับ (kg)</label><input id="qg_kg" type="number" min="0" step="any" placeholder="0" oninput="recalcQuickGas()"></div>
-   <div class="fld"><label>ยอดเงินที่จ่าย (บาท)</label><input id="qg_amt" type="number" min="0" step="any" placeholder="0" oninput="recalcQuickGas()"></div>
+   <div class="fld"><label>ราคาแก๊ส (บาท/kg)</label><input id="qg_price" type="number" min="0" step="any" placeholder="0" oninput="recalcQuickGas()"></div>
   </div>
   <div class="fld"><label>โน้ต (ไม่บังคับ)</label><input id="qg_note" placeholder="เช่น ซื้อจากรถส่งแก๊ส"></div>
-  <div style="font-size:13.5px;color:var(--muted)">เฉลี่ย <span id="qg_avg">฿0</span> / kg</div>`,
+  <div style="font-size:13.5px;color:var(--muted)">ยอดรวม <span id="qg_avg">฿0</span></div>`,
   null, null, {foot:`<div class="mfoot"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn" onclick="savePress(this,'saveQuickGasReceive')">บันทึก</button></div>`});
 }
 function recalcQuickGas(){
- const kg=Number(val('qg_kg'))||0, amt=Number(val('qg_amt'))||0;
+ const kg=Number(val('qg_kg'))||0, price=Number(val('qg_price'))||0;
  const box=document.getElementById('qg_avg');
- if(box) box.textContent=baht(kg>0?amt/kg:0);
+ if(box) box.textContent=baht(kg*price);
 }
 function saveQuickGasReceive(){
  const raw=db.products.find(p=>p.kind==='ดิบ');
  if(!raw) return;
  const kg=Number(val('qg_kg'));
- const amt=Number(val('qg_amt'));
+ const price=Number(val('qg_price'));
  if(!(kg>0)){ alert('กรอกน้ำหนักที่รับให้ถูกต้อง'); return; }
  const note=val('qg_note')||'รับแก๊สดิบด่วน';
  addMove(raw.id, 'รับเข้า', kg, note);
- if(amt>0) addMoneyRow('ออก', amt, note+' ('+kg+' kg)', {category:'วัตถุดิบ'});
+ const amt=kg*price;
+ if(amt>0) addMoneyRow('ออก', amt, note+' ('+kg+' kg x '+baht(price)+'/kg)', {category:'วัตถุดิบ'});
  closeModal(); render();
 }
 
