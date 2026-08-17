@@ -795,13 +795,13 @@ function gasAvailable(p){
 }
 
 /* ⭐ กราฟวงกลมยอดแก๊สคงเหลือ (แดชบอร์ด) — คงเหลือ vs ขายไปแล้ว คำนวณจากแก๊สดิบล้วนๆ
-   ขายไปแล้ว = ผลรวม "รับเข้า/ปรับเพิ่ม" ทั้งหมดที่เคยมี ลบด้วยคงเหลือตอนนี้ (ไม่เก็บเป็นตัวเลขแยก คำนวณสดทุกครั้ง) */
+   ขายไปแล้ว = ผลรวม "เบิกออก/ปรับลด" ทั้งหมดที่เคยเกิดกับแก๊สดิบ (นับของที่ตัดออกจริงเท่านั้น — ไม่พึ่งยอดรับเข้าตอนตั้งต้น
+   ตอน seed เพราะสต๊อกเริ่มต้นไม่เคยถูกบันทึกเป็น move ถ้าเอา received-remaining จะได้ตัวเลขติดลบ/ผิดเพี้ยน) */
 function gasChartInfo(){
  const raw=db.products.find(p=>p.kind==='ดิบ');
  if(!raw) return null;
- const received=db.moves.filter(m=>m.productId===raw.id && (m.type==='รับเข้า'||m.type==='ปรับเพิ่ม')).reduce((s,m)=>s+(Number(m.qty)||0),0);
+ const used=db.moves.filter(m=>m.productId===raw.id && (m.type==='เบิกออก'||m.type==='ปรับลด')).reduce((s,m)=>s+(Number(m.qty)||0),0);
  const remaining=Math.max(0, Number(raw.stock)||0);
- const used=Math.max(0, received-remaining);
  return {raw, remaining, used, total:remaining+used};
 }
 function gasChartCard(){
