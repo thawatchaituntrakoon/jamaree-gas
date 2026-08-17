@@ -336,6 +336,13 @@ function normalizeDb(){
  if(!Array.isArray(db.vendors)) db.vendors=[];
  if(!Array.isArray(db.pos)) db.pos=[];
  if(!Array.isArray(db.custody)) db.custody=[];   // ยืม/คืน/ฝากถังรายลูกค้า
+ // ⭐ migration: สินค้าน้ำแก๊สที่ยังเหลือชื่อเก่า "ถังเต็ม Xkg (แลกถัง)" (จากก่อนแยกน้ำแก๊ส/ถังแก๊ส) → เปลี่ยนเป็น "แก๊ส X กก." ให้ตรงดรอปดาวน์ขายปัจจุบัน
+ db.products.forEach(p=>{
+  if(p.kind==='น้ำแก๊ส' && /ถังเต็ม|แลกถัง/.test(p.name||"")){
+   const num=String(p.size||"").replace(/kg$/i,"");
+   if(num) p.name="แก๊ส "+num+" กก.";
+  }
+ });
  db.pos.forEach(po=>{
   if(!Array.isArray(po.items)) po.items=[];
   if(po.receivedAt===undefined) po.receivedAt=null;
