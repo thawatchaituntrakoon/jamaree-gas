@@ -1196,18 +1196,22 @@ function createPoFromLowStock(){
 }
 
 /* ⭐ รับแก๊สดิบด่วน — ทางลัดสำหรับซื้อสดหน้างาน ไม่ผ่านผู้ขาย/PO
-   กรอกน้ำหนักที่รับ+ราคาแก๊สต่อกิโลตรงๆ (พิมพ์ได้ทั้งคู่) ระบบคูณยอดรวมให้เอง แล้วตัดเข้าสต๊อกแก๊สดิบ + ลงบัญชีจ่ายทันที (ไม่ใช่ค้างจ่ายแบบ PO) */
+   กรอกน้ำหนักที่รับ+ราคาแก๊สต่อกิโลตรงๆ ระบบคูณยอดรวมให้เอง แล้วตัดเข้าสต๊อกแก๊สดิบ + ลงบัญชีจ่ายทันที (ไม่ใช่ค้างจ่ายแบบ PO)
+   ⭐ ราคา/กก. จำค่าล่าสุดไว้ที่ raw.cost (เดิมเป็นต้นทุน/หน่วยของสินค้าอยู่แล้ว) — เปิดฟอร์มมาเติมให้อัตโนมัติ ไม่ต้องพิมพ์ซ้ำทุกรอบถ้าราคาไม่เปลี่ยน แก้ในช่องได้ตามปกติเมื่อราคาขยับ */
 function openQuickGasReceive(){
  const raw=db.products.find(p=>p.kind==='ดิบ');
  if(!raw){ alert('ยังไม่มีสินค้าประเภท "แก๊สดิบ" ในระบบ — ไปเพิ่มในแท็บสินค้าก่อน'); return; }
+ const lastPrice=Number(raw.cost)||0;
  showFormPage('รับแก๊สดิบด่วน', esc(raw.name)+' — ไม่ผ่านผู้ขาย/PO เหมาะกับซื้อสดหน้างาน', `
   <div class="frow">
    <div class="fld"><label>น้ำหนักที่รับ (kg)</label><input id="qg_kg" type="number" min="0" step="any" placeholder="0" oninput="recalcQuickGas()"></div>
-   <div class="fld"><label>ราคาแก๊ส (บาท/kg)</label><input id="qg_price" type="number" min="0" step="any" placeholder="0" oninput="recalcQuickGas()"></div>
+   <div class="fld"><label>ราคาแก๊ส (บาท/kg)</label><input id="qg_price" type="number" min="0" step="any" value="${lastPrice>0?lastPrice:''}" oninput="recalcQuickGas()"></div>
   </div>
+  <div style="font-size:12.5px;color:var(--muted);margin:-8px 0 12px">จำราคาล่าสุดไว้ให้แล้ว — ราคาไม่เปลี่ยนไม่ต้องแก้ ถ้าเปลี่ยนแก้เลขในช่องได้ตามปกติ</div>
   <div class="fld"><label>โน้ต (ไม่บังคับ)</label><input id="qg_note" placeholder="เช่น ซื้อจากรถส่งแก๊ส"></div>
   <div style="font-size:13.5px;color:var(--muted)">ยอดรวม <span id="qg_avg">฿0</span></div>`,
   null, null, {foot:`<div class="mfoot"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn" onclick="savePress(this,'saveQuickGasReceive')">บันทึก</button></div>`});
+ recalcQuickGas();
 }
 function recalcQuickGas(){
  const kg=Number(val('qg_kg'))||0, price=Number(val('qg_price'))||0;
@@ -1224,6 +1228,7 @@ function saveQuickGasReceive(){
  addMove(raw.id, 'รับเข้า', kg, note);
  const amt=kg*price;
  if(amt>0) addMoneyRow('ออก', amt, note+' ('+kg+' kg x '+baht(price)+'/kg)', {category:'วัตถุดิบ'});
+ if(price>0) raw.cost=price;   // จำราคาล่าสุดไว้ใช้ครั้งถัดไป
  closeModal(); render();
 }
 
