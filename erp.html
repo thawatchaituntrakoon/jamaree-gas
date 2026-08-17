@@ -569,8 +569,8 @@ init();
 
 /* ============ ก้อนที่ 1: แท็บสินค้า ============ */
 /* ⭐ สินค้าแก๊ส (kind) — แยกหมวด "น้ำแก๊ส" (สิ่งที่ขาย) กับ "ถังแก๊ส" (ภาชนะ) ออกจากกันเด็ดขาด:
-   'ดิบ' = แก๊สในถังเก็บใหญ่ (หน่วย kg) · 'น้ำแก๊ส' = สต๊อกพร้อมขายต่อไซส์ (หน่วยนับเป็นถัง แต่คือ "น้ำแก๊ส" ไม่ใช่ตัวถัง) ขายแล้วตัดสต๊อกนี้ตรงๆ ไม่ยุ่งกับถังเปล่าเลย
-   fillKg = กิโลแก๊สที่ใช้บรรจุ "น้ำแก๊ส" 1 ถัง (ใช้ตอนกด "บรรจุแก๊ส" — ดึงจากแก๊สดิบเท่านั้น ไม่ต้องมีถังเปล่า)
+   'ดิบ' = แก๊สในถังเก็บใหญ่ (หน่วย kg) — ทะเบียนสต๊อกจริงหนึ่งเดียวของแก๊ส · 'น้ำแก๊ส' = ตัวสินค้าที่ลูกค้าซื้อต่อไซส์ (ชื่อโชว์แค่ "แก๊ส Xกก." หน่วยนับเป็นถัง) **ไม่มีสต๊อกของตัวเอง** ขาย/ยืมทีไรแปลงเป็นกิโลแล้วตัดจากแก๊สดิบตรงๆ ทันที (ดู gasAvailable() คำนวณ "คงเหลือ" สดทุกจุด)
+   fillKg = กิโลแก๊สที่ใช้บรรจุ "น้ำแก๊ส" 1 ถัง (ตัวคูณแปลงถัง↔กิโล จำเป็นเสมอ)
    'เปล่า' = ถังเปล่า (หมวดถังแก๊ส) — ไม่เกี่ยวกับการขาย/บรรจุแก๊สแล้ว ผูกอยู่กับระบบยืม/คืน/ฝากถังของลูกค้าเท่านั้น
    'ใหม่' = สต๊อกถังใหม่แยกต่างหาก (ซื้อเป็นถังพร้อมขายจากผู้ขาย) ขายแล้วไม่มีถังเปล่าคืน
    'บริการ' = ไม่มีสต๊อกจริง (เช่น ค่าแรงซ่อม) · สินค้าไม่มี kind = สินค้าทั่วไป (อุปกรณ์) */
@@ -579,15 +579,15 @@ init();
  if(db.products.length) return;
  db.products.push(
   {id:uid(), sku:"RAW-LPG", name:"แก๊สดิบ (ถังเก็บใหญ่)", unit:"kg", stock:500, lowAt:100, price:0, cost:18, kind:"ดิบ", active:true},
-  {id:uid(), sku:"GAS-4", name:"น้ำแก๊ส 4 กก.", unit:"ถัง", stock:10, lowAt:5, price:110, cost:522, kind:"น้ำแก๊ส", size:"4kg", fillKg:4, active:true},
+  {id:uid(), sku:"GAS-4", name:"แก๊ส 4 กก.", unit:"ถัง", stock:0, lowAt:5, price:110, cost:522, kind:"น้ำแก๊ส", size:"4kg", fillKg:4, active:true},
   {id:uid(), sku:"CYL-4-E", name:"ถังเปล่า 4kg", unit:"ถัง", stock:15, lowAt:5, price:0, cost:450, kind:"เปล่า", size:"4kg", active:true},
   {id:uid(), sku:"CYL-4-NEW", name:"ถังใหม่ 4kg", unit:"ถัง", stock:5, lowAt:2, price:560, cost:500, kind:"ใหม่", size:"4kg", active:true},
-  {id:uid(), sku:"GAS-11.5", name:"น้ำแก๊ส 11.5 กก.", unit:"ถัง", stock:4, lowAt:3, price:290, cost:957, kind:"น้ำแก๊ส", size:"11.5kg", fillKg:11.5, active:true},
+  {id:uid(), sku:"GAS-11.5", name:"แก๊ส 11.5 กก.", unit:"ถัง", stock:0, lowAt:3, price:290, cost:957, kind:"น้ำแก๊ส", size:"11.5kg", fillKg:11.5, active:true},
   {id:uid(), sku:"CYL-11.5-E", name:"ถังเปล่า 11.5kg", unit:"ถัง", stock:6, lowAt:3, price:0, cost:750, kind:"เปล่า", size:"11.5kg", active:true},
-  {id:uid(), sku:"GAS-15", name:"น้ำแก๊ส 15 กก.", unit:"ถัง", stock:6, lowAt:3, price:380, cost:1170, kind:"น้ำแก๊ส", size:"15kg", fillKg:15, active:true},
+  {id:uid(), sku:"GAS-15", name:"แก๊ส 15 กก.", unit:"ถัง", stock:0, lowAt:3, price:380, cost:1170, kind:"น้ำแก๊ส", size:"15kg", fillKg:15, active:true},
   {id:uid(), sku:"CYL-15-E", name:"ถังเปล่า 15kg", unit:"ถัง", stock:8, lowAt:3, price:0, cost:900, kind:"เปล่า", size:"15kg", active:true},
   {id:uid(), sku:"CYL-15-NEW", name:"ถังใหม่ 15kg", unit:"ถัง", stock:5, lowAt:2, price:1280, cost:1150, kind:"ใหม่", size:"15kg", active:true},
-  {id:uid(), sku:"GAS-48", name:"น้ำแก๊ส 48 กก.", unit:"ถัง", stock:3, lowAt:2, price:1150, cost:3064, kind:"น้ำแก๊ส", size:"48kg", fillKg:48, active:true},
+  {id:uid(), sku:"GAS-48", name:"แก๊ส 48 กก.", unit:"ถัง", stock:0, lowAt:2, price:1150, cost:3064, kind:"น้ำแก๊ส", size:"48kg", fillKg:48, active:true},
   {id:uid(), sku:"CYL-48-E", name:"ถังเปล่า 48kg", unit:"ถัง", stock:4, lowAt:2, price:0, cost:2200, kind:"เปล่า", size:"48kg", active:true},
   {id:uid(), sku:"EQ-REG", name:"หัวเร็กเกอเลเตอร์", unit:"ชิ้น", stock:12, lowAt:3, price:250, cost:150, active:true},
   {id:uid(), sku:"EQ-HOSE", name:"สายยางแก๊ส", unit:"เมตร", stock:30, lowAt:10, price:60, cost:35, active:true},
@@ -601,8 +601,9 @@ init();
 function prodStatus(p){
  if(p.kind==='บริการ') return "บริการ";
  if(p.kind==='ชำรุด') return p.stock>0 ? "รอส่งคืน" : "ไม่มีค้าง";
- if(p.stock<=0) return "หมด";
- if(p.stock<=p.lowAt) return "ใกล้หมด";
+ const avail=gasAvailable(p);
+ if(avail<=0) return "หมด";
+ if(avail<=p.lowAt) return "ใกล้หมด";
  return "พอ";
 }
 
@@ -612,7 +613,8 @@ function renderProducts(){
  // ⭐ แท็บนี้เน้น "ขายน้ำแก๊ส" ล้วนๆ — ถังเปล่า (kind='เปล่า') ไม่ใช่ของขาย ผูกกับระบบยืม/คืน/ฝากถังของลูกค้าเท่านั้น
  //   จึงไม่โชว์ในรายการนี้ (ยังแก้ยอดได้ผ่าน "ตรวจนับสต๊อก" ถ้าจำเป็น) — รอทำเป็นเมนู "ระบบถัง" แยกต่างหากทีหลัง
  const visible=db.products.filter(p=>p.kind!=='เปล่า');
- const lowCount=visible.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.active!==false && p.stock<=p.lowAt).length;
+ // น้ำแก๊สไม่นับเป็น "ของใกล้หมด" ที่ต้องสั่งซื้อ — ตัวจริงที่ต้องเติมคือแก๊สดิบ ซึ่งจะเตือนของมันเองอยู่แล้ว
+ const lowCount=visible.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='น้ำแก๊ส' && p.active!==false && p.stock<=p.lowAt).length;
  let html=`<div class="pagehead"><div><h2>สินค้า</h2><div class="sub">ทะเบียนสินค้าและคงเหลือ (น้ำแก๊ส/ถังใหม่/อุปกรณ์/บริการ)</div></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
    ${lowCount?`<button class="btn ghost" style="color:var(--warn);border-color:var(--warn)" onclick="createPoFromLowStock()">สั่งของใกล้หมด (${lowCount})</button>`:''}
@@ -623,6 +625,7 @@ function renderProducts(){
  const rows=visible.map(p=>{
   const st=prodStatus(p);
   const isSvc=p.kind==='บริการ';
+  const isGas=p.kind==='น้ำแก๊ส';
   const profit=(Number(p.price)||0)-(Number(p.cost)||0);   // คำนวณสดตอน render — ไม่เก็บลง db
   const pcls=profit>=0?'money-pos':'money-neg';
   const inactive=p.active===false;
@@ -631,19 +634,17 @@ function renderProducts(){
   const delOrToggleBtn = hasMoves
    ? `<button class="lnk" onclick="toggleProductActive('${p.id}')">${inactive?'เปิดใช้งาน':'ปิดใช้งาน'}</button>`
    : `<button class="lnk del" onclick="delRow('products','${p.id}')">ลบ</button>`;
-  const fillBtn = p.kind==='น้ำแก๊ส' ? `<button class="lnk" onclick="openFillCylinderForm('${p.id}')">บรรจุแก๊ส</button>` : '';
   return `<tr style="${inactive?'opacity:.5':''}">
    <td>${esc(p.sku||"")}</td>
    <td><button class="lnk" style="padding:0;font-weight:600;color:var(--ink)" onclick="openProductDetail('${p.id}')">${esc(p.name)}</button>${inactive?' <span class="chip c-ปิดใช้งาน">ปิดใช้งาน</span>':''}</td>
    <td>${kindLabel}</td>
-   <td class="num">${isSvc?'—':p.stock}</td>
+   <td class="num">${isSvc?'—':gasAvailable(p)}</td>
    <td>${esc(p.unit)}</td>
    <td><span class="chip c-${st}">${st}</span></td>
    <td class="num">${baht(p.price)}</td>
    <td class="num ${pcls}">${baht(profit)}</td>
    <td class="act">
-    ${fillBtn}
-    ${isSvc?'':`<button class="lnk" style="color:var(--ok)" onclick="openMove('${p.id}','รับเข้า')">+รับ</button><button class="lnk del" onclick="openMove('${p.id}','เบิกออก')">−เบิก</button>`}
+    ${(isSvc||isGas)?'':`<button class="lnk" style="color:var(--ok)" onclick="openMove('${p.id}','รับเข้า')">+รับ</button><button class="lnk del" onclick="openMove('${p.id}','เบิกออก')">−เบิก</button>`}
     <button class="lnk" onclick="openProductForm('${p.id}')">แก้</button>
     ${delOrToggleBtn}
    </td>
@@ -677,9 +678,10 @@ function openProductForm(id){
    <div class="fld" id="p_fillKgFld" style="display:none"><label>กิโลแก๊สที่ใช้บรรจุ/ถัง</label><input id="p_fillKg" type="number" value="${p?(Number(p.fillKg)||""):""}" placeholder="เช่น 4"></div>
   </div>
   <div class="frow" id="p_stockRow">
-   <div class="fld"><label>คงเหลือเริ่มต้น</label><input id="p_stock" type="number" value="${p?p.stock:""}" ${p?"disabled":""}></div>
-   <div class="fld"><label>เตือนเมื่อเหลือต่ำกว่า</label><input id="p_low" type="number" value="${p?p.lowAt:""}" placeholder="0"></div>
+   <div class="fld" id="p_stockOnlyFld"><label>คงเหลือเริ่มต้น</label><input id="p_stock" type="number" value="${p?p.stock:""}" ${p?"disabled":""}></div>
+   <div class="fld" id="p_lowFld"><label>เตือนเมื่อเหลือต่ำกว่า</label><input id="p_low" type="number" value="${p?p.lowAt:""}" placeholder="0"></div>
   </div>
+  <div class="fld" id="p_gasAutoNote" style="display:none;margin-top:-6px;font-size:12.5px;color:var(--muted)">คงเหลือคำนวณอัตโนมัติจากแก๊สดิบ (ถังเก็บใหญ่) ÷ กิโลที่ใช้บรรจุ ไม่ต้องตั้งเอง</div>
   <div class="frow">
    <div class="fld"><label id="p_priceLabel">ราคาขาย</label><input id="p_price" type="number" value="${p?p.price:""}" placeholder="0"></div>
    <div class="fld"><label>ต้นทุน/หน่วย (บาท)</label><input id="p_cost" type="number" value="${p?(Number(p.cost)||0):""}" placeholder="0"></div>
@@ -690,10 +692,14 @@ function openProductForm(id){
 function onProductKindChange(){
  const kind=val("p_kind");
  const isCyl = kind==='เปล่า' || kind==='น้ำแก๊ส' || kind==='ใหม่' || kind==='ชำรุด';
+ const isGas = kind==='น้ำแก๊ส';
+ const isSvc = kind==='บริการ';
  const sizeRow=document.getElementById("p_sizeRow"); if(sizeRow) sizeRow.style.display = isCyl?"":"none";
- const fillFld=document.getElementById("p_fillKgFld"); if(fillFld) fillFld.style.display = kind==='น้ำแก๊ส'?"":"none";
- const stockRow=document.getElementById("p_stockRow"); if(stockRow) stockRow.style.display = kind==='บริการ'?"none":"";
- const priceLabel=document.getElementById("p_priceLabel"); if(priceLabel) priceLabel.textContent = kind==='น้ำแก๊ส'?"ราคาขายแลกถัง":"ราคาขาย";
+ const fillFld=document.getElementById("p_fillKgFld"); if(fillFld) fillFld.style.display = isGas?"":"none";
+ const stockOnlyFld=document.getElementById("p_stockOnlyFld"); if(stockOnlyFld) stockOnlyFld.style.display = (isSvc||isGas)?"none":"";
+ const lowFld=document.getElementById("p_lowFld"); if(lowFld) lowFld.style.display = isSvc?"none":"";
+ const gasNote=document.getElementById("p_gasAutoNote"); if(gasNote) gasNote.style.display = isGas?"":"none";
+ const priceLabel=document.getElementById("p_priceLabel"); if(priceLabel) priceLabel.textContent = isGas?"ราคาขายแลกถัง":"ราคาขาย";
 }
 
 function saveProduct(id){
@@ -701,14 +707,15 @@ function saveProduct(id){
  if(!name) return;
  const kind=val("p_kind")||undefined;
  const isSvc=kind==='บริการ';
+ const isGas=kind==='น้ำแก๊ส';
  const size=(kind==='เปล่า'||kind==='น้ำแก๊ส'||kind==='ใหม่'||kind==='ชำรุด')?(val("p_size")||undefined):undefined;
- const fillKg=kind==='น้ำแก๊ส'?(Number(val("p_fillKg"))||undefined):undefined;
+ const fillKg=isGas?(Number(val("p_fillKg"))||undefined):undefined;
  if(id){
   const p=db.products.find(x=>x.id===id);
   if(p){ p.sku=val("p_sku"); p.name=name; p.unit=val("p_unit"); p.lowAt=isSvc?0:(Number(val("p_low"))||0); p.price=Number(val("p_price"))||0; p.cost=Number(val("p_cost"))||0;
    p.kind=kind; p.size=size; p.fillKg=fillKg; }
  }else{
-  db.products.push({id:uid(), sku:val("p_sku"), name, unit:val("p_unit"), stock:isSvc?0:(Number(val("p_stock"))||0), lowAt:isSvc?0:(Number(val("p_low"))||0), price:Number(val("p_price"))||0, cost:Number(val("p_cost"))||0,
+  db.products.push({id:uid(), sku:val("p_sku"), name, unit:val("p_unit"), stock:(isSvc||isGas)?0:(Number(val("p_stock"))||0), lowAt:isSvc?0:(Number(val("p_low"))||0), price:Number(val("p_price"))||0, cost:Number(val("p_cost"))||0,
    kind, size, fillKg, active:true});
  }
  closeModal(); save(); render();
@@ -731,10 +738,13 @@ function openProductDetail(id){
   return `<div class="li"><div class="main"><button class="lnk" style="padding:0;font-weight:600;color:var(--ink)" onclick="openOrderDetail('${o.id}')">ออเดอร์ ${thDate(o.date)}</button><div class="m">${c?esc(c.name):'—'} · ใช้ ${esc(it.qty)} ${esc(p.unit)}</div></div><span class="chip c-${esc(o.status)}">${esc(o.status)}</span></div>`;
  }).join('') : `<div class="empty">ยังไม่มีออเดอร์ใช้สินค้านี้</div>`;
 
- const kindLine = p.kind ? `<div style="font-size:13.5px;color:var(--muted);margin-bottom:18px">ประเภท ${esc(p.kind)}${p.size?' · ขนาด '+esc(p.size):''}${p.kind==='น้ำแก๊ส'?' · ใช้แก๊สดิบ '+(Number(p.fillKg)||0)+' kg/ถัง':''}</div>` : '';
+ const isGas=p.kind==='น้ำแก๊ส';
+ const rawP=isGas?db.products.find(x=>x.kind==='ดิบ'):null;
+ const kindLine = p.kind ? `<div style="font-size:13.5px;color:var(--muted);margin-bottom:18px">ประเภท ${esc(p.kind)}${p.size?' · ขนาด '+esc(p.size):''}${isGas?' · ใช้แก๊สดิบ '+(Number(p.fillKg)||0)+' kg/ถัง (ตัดจากถังเก็บใหญ่ตรงๆ ตอนขาย)':''}</div>` : '';
+ const gasHistoryNote = isGas ? `<div class="empty">ถังไซส์นี้ไม่มีสต๊อกของตัวเอง (ตัดจากแก๊สดิบตรงๆ) — ดูประวัติการขาย/ยืมได้ที่บัตรสต๊อกของ${rawP?`<button class="lnk" style="padding:0" onclick="openProductDetail('${rawP.id}')">${esc(rawP.name)}</button>`:'แก๊สดิบ'}</div>` : '';
  showDetailPage(esc(p.name), p.sku?'รหัส '+esc(p.sku):'', `
   <div class="grid g4" style="margin-bottom:18px">
-   <div class="card stat" style="padding:12px 14px"><div class="lab">คงเหลือ</div><b>${p.kind==='บริการ'?'—':p.stock+' '+esc(p.unit)}</b></div>
+   <div class="card stat" style="padding:12px 14px"><div class="lab">คงเหลือ</div><b>${p.kind==='บริการ'?'—':gasAvailable(p)+' '+esc(p.unit)}</b></div>
    <div class="card stat" style="padding:12px 14px"><div class="lab">สถานะ</div><span class="chip c-${st}">${st}</span></div>
    <div class="card stat" style="padding:12px 14px"><div class="lab">ราคาขาย</div><b>${baht(p.price)}</b></div>
    <div class="card stat" style="padding:12px 14px"><div class="lab">กำไร/ชิ้น</div><b class="${profit>=0?'money-pos':'money-neg'}">${baht(profit)}</b></div>
@@ -742,12 +752,11 @@ function openProductDetail(id){
   <div style="font-size:13.5px;color:var(--muted);margin-bottom:4px">ต้นทุน/หน่วย ${baht(p.cost||0)} · เตือนเมื่อเหลือต่ำกว่า ${p.lowAt}</div>
   ${kindLine}
   <div style="font-size:13.5px;font-weight:700;margin-bottom:8px">บัตรสต๊อก (ประวัติการเคลื่อนไหว)</div>
-  ${moveRows ? tbl(['วันที่','ประเภท',['จำนวน','num'],'โน้ต'], moveRows) : empty('ยังไม่มีการเคลื่อนไหว')}
+  ${isGas ? gasHistoryNote : (moveRows ? tbl(['วันที่','ประเภท',['จำนวน','num'],'โน้ต'], moveRows) : empty('ยังไม่มีการเคลื่อนไหว'))}
   <div style="font-size:13.5px;font-weight:700;margin:20px 0 8px">ออเดอร์ที่ใช้สินค้านี้</div>
   <div class="rowlist">${orderRows}</div>
  `, {wide:true, actions:
-  (p.kind==='น้ำแก๊ส' ? `<button class="btn sm" onclick="openFillCylinderForm('${id}')">บรรจุแก๊ส</button>` : '')+
-  (p.kind==='บริการ' ? '' : `<button class="btn sm" style="background:var(--ok)" onclick="openMove('${id}','รับเข้า')">+รับ</button><button class="btn ghost sm" onclick="openMove('${id}','เบิกออก')">−เบิก</button>`)+
+  ((p.kind==='บริการ'||isGas) ? '' : `<button class="btn sm" style="background:var(--ok)" onclick="openMove('${id}','รับเข้า')">+รับ</button><button class="btn ghost sm" onclick="openMove('${id}','เบิกออก')">−เบิก</button>`)+
   `<button class="btn ghost sm" onclick="openProductForm('${id}')">แก้</button>`
  });
 }
@@ -774,40 +783,14 @@ function openMove(productId, type){
   <div class="fld"><label>โน้ต (ไม่บังคับ)</label><input id="mvNote" placeholder="เช่น ล็อตใหม่ / ขายหน้าร้าน"></div>`, "saveMove", productId+'|'+type);
 }
 
-/* ============ เครื่องยนต์บรรจุแก๊ส — แปลงแก๊สดิบ → น้ำแก๊ส (สต๊อกพร้อมขาย) แบบตัดสต๊อกครบชุดในครั้งเดียว ============
-   ⭐ ไม่เกี่ยวกับถังเปล่าเลย (หมวดถังแก๊สแยกออกไปผูกกับระบบยืม/คืน/ฝากถังต่างหาก) · ใช้ raw ตัวแรกที่เจอ (kind='ดิบ') เป็นแหล่งแก๊สดิบเดียว
-   ทุกครั้งที่บรรจุจะสร้าง refId เดียวกันผูก 2 move (เบิกแก๊สดิบ+รับน้ำแก๊ส) ให้สืบย้อนเป็นชุดเดียวกันได้ */
-function fillCylinder(fullId, qty){
- const full=db.products.find(x=>x.id===fullId);
- if(!full || full.kind!=='น้ำแก๊ส'){ alert('เลือกสินค้าประเภทน้ำแก๊สเท่านั้น'); return; }
+/* ⭐ ไม่มีขั้น "บรรจุแก๊ส" คั่นกลางอีกต่อไป — ขายน้ำแก๊สไซส์ไหนก็ตัดจากแก๊สดิบ (ถังเก็บใหญ่) ตรงๆ ทันทีตอนขาย/ยืม
+   'คงเหลือ' ของสินค้า kind='น้ำแก๊ส' จึงไม่ใช่ค่าที่เก็บ (ไม่มีความหมายแล้ว) แต่คำนวณสดจากแก๊สดิบหารด้วย fillKg เสมอ
+   raw ตัวแรกที่เจอ (kind='ดิบ') = แหล่งแก๊สดิบเดียวของระบบ */
+function gasAvailable(p){
+ if(!p || p.kind!=='น้ำแก๊ส') return p?p.stock:0;
  const raw=db.products.find(x=>x.kind==='ดิบ');
- if(!raw){ alert('ไม่พบสินค้าแก๊สดิบในระบบ — ไปเพิ่มสินค้าประเภทแก๊สดิบก่อน'); return; }
- const q=Number(qty);
- if(!(q>0)) return;
- const kgNeed=q*(Number(full.fillKg)||0);
- if(!(kgNeed>0)){ alert('สินค้านี้ยังไม่ได้ตั้ง "กิโลแก๊สที่ใช้บรรจุ/ถัง" — ไปแก้ไขสินค้าก่อน'); return; }
- if(raw.stock<kgNeed){ alert('แก๊สดิบไม่พอ เหลือ '+raw.stock+' kg (ต้องใช้ '+kgNeed+' kg)'); return; }
- const refId=uid();
- addMove(raw.id, 'เบิกออก', kgNeed, 'บรรจุแก๊ส '+(full.size||''), {refType:'fill', refId});
- addMove(full.id, 'รับเข้า', q, 'บรรจุแก๊ส '+(full.size||''), {refType:'fill', refId});
- closeModal(); render();
-}
-
-function openFillCylinderForm(fullId){
- const full=db.products.find(x=>x.id===fullId);
- if(!full) return;
- const raw=db.products.find(x=>x.kind==='ดิบ');
- showFormPage('บรรจุแก๊ส', esc(full.name), `
-  <div style="font-size:13.5px;color:var(--muted);margin-bottom:12px">
-   ใช้แก๊สดิบ ${raw?raw.stock+' kg คงเหลือ':'— ไม่พบแก๊สดิบ —'} (ใช้ ${Number(full.fillKg)||0} kg/ถัง)
-  </div>
-  <div class="fld"><label>จำนวนที่จะบรรจุ (ถัง)</label><input id="fc_qty" type="number" min="1" placeholder="0"></div>`,
-  null, null, {foot:`<div class="mfoot"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn" onclick="savePress(this,'saveFillCylinder','${fullId}')">บันทึก</button></div>`});
-}
-function saveFillCylinder(fullId){
- const qty=Number(val('fc_qty'));
- if(!(qty>0)){ alert('กรอกจำนวนให้ถูกต้อง'); return; }
- fillCylinder(fullId, qty);
+ if(!raw || !(Number(p.fillKg)>0)) return 0;
+ return Math.floor((Number(raw.stock)||0)/Number(p.fillKg));
 }
 
 function saveMove(key){
@@ -1017,7 +1000,8 @@ function openVendorDetail(id){
    items[].productId = null ได้ ("ไม่ระบุสินค้า") — พิมพ์ชื่อเองก็สั่งได้ แต่รับของแล้วไม่ตัด/ไม่เพิ่มสต๊อก
    ราคา/หน่วย ใส่เป็นราคาต่อหน่วยของสินค้านั้น (เช่น แก๊สดิบหน่วย kg → นี่คือราคาต่อกิโล) ยอดรวมคำนวณสดจากจำนวน×ราคา */
 function poItemRow(productId, name, qty, price){
- const opts=db.products.filter(p=>p.active!==false).map(p=>`<option value="${p.id}" data-cost="${Number(p.cost)||0}" ${p.id===productId?'selected':''}>${esc(p.name)} (${esc(p.unit)})</option>`).join('');
+ // น้ำแก๊ส (kind='น้ำแก๊ส') ไม่มีสต๊อกของตัวเอง ซื้อเข้าตรงๆ ไม่ได้ — ต้องซื้อ "แก๊สดิบ" แทน (ถังใหญ่จะไปหารเป็นน้ำแก๊สแต่ละไซส์ให้เองตอนขาย)
+ const opts=db.products.filter(p=>p.kind!=='น้ำแก๊ส' && (p.active!==false || p.id===productId)).map(p=>`<option value="${p.id}" data-cost="${Number(p.cost)||0}" ${p.id===productId?'selected':''}>${esc(p.name)} (${esc(p.unit)})</option>`).join('');
  return `<div class="frow pi-row" style="align-items:flex-end;margin-bottom:8px">
    <div class="fld" style="flex:2;margin-bottom:0"><select class="pi-prod" onchange="onPoItemProductChange(this)"><option value="">— ไม่ระบุสินค้า (พิมพ์ชื่อเอง) —</option>${opts}</select>
     <input class="pi-name" placeholder="ชื่อรายการ (ถ้าไม่ระบุสินค้า)" value="${name?esc(name):''}" style="margin-top:6px;${productId?'display:none':''}">
@@ -1380,9 +1364,11 @@ function saveBorrowCylinder(customerId){
  if(!size || !(qty>0)){ alert('เลือกขนาดและจำนวนให้ถูกต้อง'); return; }
  const full=db.products.find(p=>p.kind==='น้ำแก๊ส' && p.size===size);
  if(!full){ alert('ไม่พบน้ำแก๊สขนาดนี้ในระบบ'); return; }
- if(full.stock<qty){ alert('น้ำแก๊สไม่พอ เหลือ '+full.stock); return; }
+ const raw=db.products.find(p=>p.kind==='ดิบ');
+ const kgNeed=qty*(Number(full.fillKg)||0);
+ if(!raw || raw.stock<kgNeed){ alert('แก๊สดิบไม่พอ: ต้องใช้ '+kgNeed+' kg เหลือ '+(raw?raw.stock:0)+' kg'); return; }
  const refId=uid();
- addMove(full.id, 'เบิกออก', qty, 'ยืมถัง (ค้างคืนถังเปล่า)', {refType:'custody', refId});
+ addMove(raw.id, 'เบิกออก', kgNeed, 'ยืมถัง (ค้างคืนถังเปล่า) '+size, {refType:'custody', refId});
  addMoneyRow('เข้า', qty*(Number(full.price)||0), 'ยืมถัง '+size+' x'+qty, {category:'ขาย', refType:'custody', refId});
  db.custody.push({id:refId, date:todayStr(), customerId, size, type:'ยืม', qty, note:val('cu_note')||''});
  save(); closeModal(); openCustomerDetail(customerId);
@@ -1564,8 +1550,9 @@ function renderOrders(){
 }
 
 function orderItemRow(pid, qty){
- const opts=db.products.filter(p=>p.active!==false || p.id===pid).map(p=>{
-  const label = p.kind==='บริการ' ? esc(p.name) : esc(p.name)+' (คงเหลือ '+p.stock+' '+esc(p.unit)+')';
+ // ถังเปล่า (kind='เปล่า') ไม่ใช่ของขาย ไม่โผล่ในหน้าออเดอร์เลย — อยู่แค่ในระบบยืม/คืน/ฝากถังของลูกค้า
+ const opts=db.products.filter(p=>p.kind!=='เปล่า' && (p.active!==false || p.id===pid)).map(p=>{
+  const label = p.kind==='บริการ' ? esc(p.name) : esc(p.name)+' (คงเหลือ '+gasAvailable(p)+' '+esc(p.unit)+')';
   return `<option value="${p.id}" ${p.id===pid?"selected":""}>${label}</option>`;
  }).join("");
  return `<div class="frow oi-row" style="align-items:flex-end;margin-bottom:8px">
@@ -1636,18 +1623,30 @@ function saveOrder(id){
 }
 
 /* ⭐ หัวใจก้อนนี้: ปิดออเดอร์ = ตัดสต๊อกผ่าน addMove จุดเดียว
-   น้ำแก๊ส/ถังใหม่ → ตัดสต๊อกก้อนของตัวเองตรงๆ ไม่ยุ่งกับถังเปล่าเลย (หมวดถังแก๊สแยกออกไปผูกกับระบบยืม/คืน/ฝากถังต่างหาก)
-   บริการ (kind='บริการ') → ไม่ตัดสต๊อกเลย */
+   น้ำแก๊ส → ไม่มีสต๊อกของตัวเอง แปลงเป็นกิโลแล้วตัดจากแก๊สดิบ (ถังเก็บใหญ่) ตรงๆ · ถังใหม่ → ตัดสต๊อกก้อนของตัวเอง
+   บริการ (kind='บริการ') → ไม่ตัดสต๊อกเลย · เช็ครวมกิโลแก๊สที่ต้องใช้ทั้งออเดอร์ก่อนตัดจริง กันกรณีมีหลายไซส์ในออเดอร์เดียวรวมกันเกินที่มี */
 function completeOrder(id){
  const o=db.orders.find(x=>x.id===id);
  if(!o || o.stockDeducted) return;   // กันตัดซ้ำ
+ const raw=db.products.find(x=>x.kind==='ดิบ');
+ let rawKgNeeded=0;
  for(const it of o.items){
   const p=db.products.find(x=>x.id===it.productId);
+  if(p && p.kind==='น้ำแก๊ส'){ rawKgNeeded += Number(it.qty)*(Number(p.fillKg)||0); continue; }
   if(p && p.kind!=='บริการ' && Number(it.qty)>p.stock){ alert("ของไม่พอ: "+p.name+" เหลือ "+p.stock); return; }
+ }
+ if(rawKgNeeded>0){
+  if(!raw){ alert('ไม่พบสินค้าแก๊สดิบในระบบ'); return; }
+  if(raw.stock<rawKgNeeded){ alert('แก๊สดิบไม่พอ: ต้องใช้ '+rawKgNeeded+' kg เหลือ '+raw.stock+' kg'); return; }
  }
  o.items.forEach(it=>{
   const p=db.products.find(x=>x.id===it.productId);
   if(p && p.kind==='บริการ') return;   // บริการไม่ตัดสต๊อก
+  if(p && p.kind==='น้ำแก๊ส'){
+   const kgNeed=Number(it.qty)*(Number(p.fillKg)||0);
+   addMove(raw.id, "เบิกออก", kgNeed, "ขายแก๊ส "+(p.size||p.name)+" x"+it.qty, {refType:'order', refId:o.id});
+   return;
+  }
   addMove(it.productId, "เบิกออก", it.qty, "ขาย/ออเดอร์", {refType:'order', refId:o.id});
  });
  o.stockDeducted=true; o.status="เสร็จ"; o.workStage="ปิด";
