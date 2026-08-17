@@ -348,6 +348,18 @@ function normalizeDb(){
    if(num) p.name="แก๊ส "+num+" กก.";
   }
  });
+ // ⭐ migration: เติมกอง "ชำรุด"/"ต่างยี่ห้อ" ให้ครบทุกไซส์ถังที่ร้านมีจริง (เทียบจากไซส์ถังเปล่าที่มีอยู่) — กันแอปเก่าที่ยังไม่มีกองพวกนี้ครบ (เช่น sizeใหม่ที่เพิ่งเพิ่ม หรือสร้างมาก่อนมีฟีเจอร์นี้)
+ (function(){
+  const sizes=[...new Set(db.products.filter(p=>p.kind==='เปล่า' && p.size).map(p=>p.size))];
+  sizes.forEach(size=>{
+   if(!db.products.some(p=>p.kind==='ชำรุด' && p.size===size)){
+    db.products.push({id:uid(), sku:'DMG-'+size.replace(/kg$/i,''), name:'ถังชำรุด '+size, unit:'ถัง', stock:0, lowAt:0, price:0, cost:0, kind:'ชำรุด', size, active:true});
+   }
+   if(!db.products.some(p=>p.kind==='ต่างยี่ห้อ' && p.size===size)){
+    db.products.push({id:uid(), sku:'OTH-'+size.replace(/kg$/i,''), name:'ถังต่างยี่ห้อ '+size, unit:'ถัง', stock:0, lowAt:0, price:0, cost:0, kind:'ต่างยี่ห้อ', size, active:true});
+   }
+  });
+ })();
  db.pos.forEach(po=>{
   if(!Array.isArray(po.items)) po.items=[];
   if(po.receivedAt===undefined) po.receivedAt=null;
@@ -466,7 +478,8 @@ const ICONS={
  refresh:'M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5',
  clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v5l3 2',
  hammer:'M14 3l7 7-3 3-7-7zM11 6 3 14v7h7l8-8',
- truck:'M1 3h15v13H1zM16 8h4l3 3v5h-7V8zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'
+ truck:'M1 3h15v13H1zM16 8h4l3 3v5h-7V8zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+ tank:'M9 2h6M10 2v2.6c0 .9-.5 1.7-1.3 2.2C7.2 7.8 6 9.7 6 12v7a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-7c0-2.3-1.2-4.2-2.7-5.2A2.6 2.6 0 0 1 14 4.6V2'
 };
 function icon(name,size){
  const d=ICONS[name]; if(!d) return '';
@@ -483,7 +496,7 @@ const NAV_GROUPS=[
  {label:"หน้าหลัก", keys:["dash"]},
  {label:"งาน", keys:["board"]},
  {label:"ขาย", keys:["customers","orders","docs"]},
- {label:"คลังสินค้า", keys:["products","purchases"]},
+ {label:"คลังสินค้า", keys:["products","tanks","purchases"]},
  {label:"การเงิน", keys:["money"]},
  {label:"ทีมงาน", keys:["staff","attendance","payroll"]}
 ];
@@ -495,8 +508,8 @@ const NAV_GROUPS=[
    ห้ามถอดข้อความเตือนในตัวสลับบทบาทออก คนใช้ต้องรู้ว่าอันนี้ไม่ใช่ของจริง */
 const ROLE_LABEL={owner:"เจ้าของ", manager:"หัวหน้า", staff:"พนักงาน"};
 const ROLE_TABS={
- owner:  ["dash","board","customers","orders","docs","products","purchases","money","staff","attendance","payroll"],
- manager:["dash","board","customers","orders","docs","products","purchases","staff","attendance"],
+ owner:  ["dash","board","customers","orders","docs","products","tanks","purchases","money","staff","attendance","payroll"],
+ manager:["dash","board","customers","orders","docs","products","tanks","purchases","staff","attendance"],
  staff:  ["board","attendance"]
 };
 function actingStaff(){ return db.actingAs ? db.staff.find(s=>s.id===db.actingAs) : null; }
@@ -605,14 +618,20 @@ init();
   {id:uid(), sku:"EQ-HOSE", name:"สายยางแก๊ส", unit:"เมตร", stock:30, lowAt:10, price:60, cost:35, active:true},
   {id:uid(), sku:"SVC-VALVE", name:"ซ่อมวาล์ว", unit:"ครั้ง", stock:0, lowAt:0, price:150, cost:50, kind:"บริการ", active:true},
   {id:uid(), sku:"DMG-4", name:"ถังชำรุด 4kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ชำรุด", size:"4kg", active:true},
-  {id:uid(), sku:"DMG-15", name:"ถังชำรุด 15kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ชำรุด", size:"15kg", active:true}
+  {id:uid(), sku:"DMG-11.5", name:"ถังชำรุด 11.5kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ชำรุด", size:"11.5kg", active:true},
+  {id:uid(), sku:"DMG-15", name:"ถังชำรุด 15kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ชำรุด", size:"15kg", active:true},
+  {id:uid(), sku:"DMG-48", name:"ถังชำรุด 48kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ชำรุด", size:"48kg", active:true},
+  {id:uid(), sku:"OTH-4", name:"ถังต่างยี่ห้อ 4kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ต่างยี่ห้อ", size:"4kg", active:true},
+  {id:uid(), sku:"OTH-11.5", name:"ถังต่างยี่ห้อ 11.5kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ต่างยี่ห้อ", size:"11.5kg", active:true},
+  {id:uid(), sku:"OTH-15", name:"ถังต่างยี่ห้อ 15kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ต่างยี่ห้อ", size:"15kg", active:true},
+  {id:uid(), sku:"OTH-48", name:"ถังต่างยี่ห้อ 48kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ต่างยี่ห้อ", size:"48kg", active:true}
  );
  save();
 })();
 
 function prodStatus(p){
  if(p.kind==='บริการ') return "บริการ";
- if(p.kind==='ชำรุด') return p.stock>0 ? "รอส่งคืน" : "ไม่มีค้าง";
+ if(p.kind==='ชำรุด' || p.kind==='ต่างยี่ห้อ') return p.stock>0 ? "รอส่งคืน" : "ไม่มีค้าง";
  const avail=gasAvailable(p);
  if(avail<=0) return "หมด";
  if(avail<=p.lowAt) return "ใกล้หมด";
@@ -623,11 +642,10 @@ registerModule({key:"products", ic:"products", label:"สินค้า", rende
 
 function renderProducts(){
  // ⭐ แท็บนี้เน้น "ขายน้ำแก๊ส" ล้วนๆ — ถังเปล่า/ถังใหม่ (kind='เปล่า'/'ใหม่') ไม่ใช่ของขายหน้าร้านปกติ
- //   ถังเปล่าผูกกับระบบยืม/คืน/ฝากถังของลูกค้า · ถังใหม่ใช้เฉพาะตอน "เปลี่ยนถังชำรุด" ในหน้าลูกค้า
- //   จึงไม่โชว์ทั้งคู่ในรายการนี้ (ยังแก้ยอดได้ผ่าน "ตรวจนับสต๊อก" ถ้าจำเป็น) — รอทำเป็นเมนู "ระบบถัง" แยกต่างหากทีหลัง
- const visible=db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ใหม่');
+ //   ถังเปล่า/ถังใหม่/ถังชำรุด/ถังต่างยี่ห้อ (kind เกี่ยวกับ "ภาชนะ") ย้ายไปอยู่แท็บ "ถัง" ทั้งหมดแล้ว — แท็บนี้เหลือแค่ของขาย (น้ำแก๊ส/อุปกรณ์/บริการ)
+ const visible=db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.kind!=='ชำรุด' && p.kind!=='ต่างยี่ห้อ');
  // น้ำแก๊สไม่นับเป็น "ของใกล้หมด" ที่ต้องสั่งซื้อ — ตัวจริงที่ต้องเติมคือแก๊สดิบ ซึ่งจะเตือนของมันเองอยู่แล้ว
- const lowCount=visible.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='น้ำแก๊ส' && p.active!==false && p.stock<=p.lowAt).length;
+ const lowCount=visible.filter(p=>p.kind!=='บริการ' && p.kind!=='น้ำแก๊ส' && p.active!==false && p.stock<=p.lowAt).length;
  let html=`<div class="pagehead"><div><h2>สินค้า</h2><div class="sub">ทะเบียนสินค้าและคงเหลือ (น้ำแก๊ส/อุปกรณ์/บริการ)</div></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
    ${lowCount?`<button class="btn ghost" style="color:var(--warn);border-color:var(--warn)" onclick="createPoFromLowStock()">สั่งของใกล้หมด (${lowCount})</button>`:''}
@@ -669,7 +687,7 @@ function renderProducts(){
 
 /* ⭐ 'น้ำแก๊ส'=สต๊อกพร้อมขาย (ขายแล้วตัดตรงๆ ไม่ยุ่งกับถังเปล่า) · 'ใหม่'=สต๊อกถังใหม่แยกต่างหาก (ขายแล้วไม่มีถังเปล่าคืน)
    'เปล่า'=หมวดถังแก๊ส ผูกกับระบบยืม/คืน/ฝากถังเท่านั้น ไม่เกี่ยวกับการขาย/บรรจุแก๊ส · 'บริการ'=ไม่มีสต๊อกจริง ขายได้อย่างเดียว ไม่ตัด/ไม่เช็คคงเหลือ */
-const PRODUCT_KINDS=[["","สินค้าทั่วไป"],["ดิบ","แก๊สดิบ (ชั่งกิโล)"],["น้ำแก๊ส","น้ำแก๊ส (สต๊อกพร้อมขาย)"],["เปล่า","ถังเปล่า"],["ใหม่","ถังใหม่ (สต๊อกแยกจากถังแลก)"],["ชำรุด","ถังชำรุด (กองรอส่งคืนบริษัท)"],["บริการ","บริการ (ไม่ตัดสต๊อก)"]];
+const PRODUCT_KINDS=[["","สินค้าทั่วไป"],["ดิบ","แก๊สดิบ (ชั่งกิโล)"],["น้ำแก๊ส","น้ำแก๊ส (สต๊อกพร้อมขาย)"],["เปล่า","ถังเปล่า"],["ใหม่","ถังใหม่ (สต๊อกแยกจากถังแลก)"],["ชำรุด","ถังชำรุด (กองรอส่งคืนบริษัท)"],["ต่างยี่ห้อ","ถังต่างยี่ห้อ (กองรอส่งคืนบริษัท)"],["บริการ","บริการ (ไม่ตัดสต๊อก)"]];
 
 function openProductForm(id){
  const p=id?db.products.find(x=>x.id===id):null;
@@ -704,7 +722,7 @@ function openProductForm(id){
 
 function onProductKindChange(){
  const kind=val("p_kind");
- const isCyl = kind==='เปล่า' || kind==='น้ำแก๊ส' || kind==='ใหม่' || kind==='ชำรุด';
+ const isCyl = kind==='เปล่า' || kind==='น้ำแก๊ส' || kind==='ใหม่' || kind==='ชำรุด' || kind==='ต่างยี่ห้อ';
  const isGas = kind==='น้ำแก๊ส';
  const isSvc = kind==='บริการ';
  const sizeRow=document.getElementById("p_sizeRow"); if(sizeRow) sizeRow.style.display = isCyl?"":"none";
@@ -721,7 +739,7 @@ function saveProduct(id){
  const kind=val("p_kind")||undefined;
  const isSvc=kind==='บริการ';
  const isGas=kind==='น้ำแก๊ส';
- const size=(kind==='เปล่า'||kind==='น้ำแก๊ส'||kind==='ใหม่'||kind==='ชำรุด')?(val("p_size")||undefined):undefined;
+ const size=(kind==='เปล่า'||kind==='น้ำแก๊ส'||kind==='ใหม่'||kind==='ชำรุด'||kind==='ต่างยี่ห้อ')?(val("p_size")||undefined):undefined;
  const fillKg=isGas?(Number(val("p_fillKg"))||undefined):undefined;
  if(id){
   const p=db.products.find(x=>x.id===id);
@@ -1225,7 +1243,7 @@ function openPoDetail(id){
 
 /* ⭐ ปุ่มลัดจากการ์ด "ของใกล้หมด" — prefill qty ให้พอกลับไป 2 เท่าของ lowAt, price = cost ปัจจุบัน */
 function createPoFromLowStock(){
- const low=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.active!==false && p.stock<=p.lowAt);
+ const low=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='ต่างยี่ห้อ' && p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.active!==false && p.stock<=p.lowAt);
  if(!low.length){ alert('ตอนนี้ไม่มีสินค้าใกล้หมด'); return; }
  const items=low.map(p=>({productId:p.id, name:p.name, qty:Math.max(1, p.lowAt*2-p.stock), price:Number(p.cost)||0}));
  openPoForm('', '', items);
@@ -1521,6 +1539,7 @@ function openCustomerDetail(id){
   <div style="font-size:13.5px;font-weight:700;margin:20px 0 8px">ถังยืม/ฝาก</div>
   ${custRows ? tbl(['ขนาด',['ค้างคืน (ยืม)','num'],['ฝากไว้','num']], custRows) : `<div class="empty">ไม่มีถังยืม/ฝากค้างอยู่</div>`}
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+   <button class="btn ghost sm" onclick="openSellCirculating('${id}')">ขายถังหมุนเวียน</button>
    <button class="btn ghost sm" onclick="openBorrowCylinder('${id}')">ยืมถัง</button>
    <button class="btn ghost sm" onclick="openReturnCylinder('${id}')">คืนถัง</button>
    <button class="btn ghost sm" onclick="openDepositCylinder('${id}')">ฝากถัง</button>
@@ -1550,6 +1569,128 @@ function openCustomerDetail(id){
   `<button class="btn ghost sm" onclick="openCustomer('${id}', {backFn:\`openCustomerDetail('${id}')\`})">แก้ข้อมูล</button>`
  });
 }
+
+/* ============ แท็บ "ถัง" — ภาพรวมถังทั้งระบบ (คลังในร้าน + ค้างที่ลูกค้า) + ขายถังหมุนเวียน ============
+   ⭐ "ขายถังหมุนเวียน" = ลูกค้าเอาถังเปล่ามาแลกสด ๆ ไม่มีค้าง (ต่างจาก "ยืมถัง" ที่ยังไม่มีถังมาคืน)
+   ตัดกิโลจากแก๊สดิบเหมือนขายน้ำแก๊สปกติ + ตัดสต๊อก "เปล่า" (ถังพร้อมหมุนเวียน) 1 ใบต่อถัง แล้วรับถังที่ได้คืนกลับเข้าตามสภาพ:
+   ยี่ห้อเรา→คืนเข้า "เปล่า" (หักล้างกันพอดี) · ยี่ห้ออื่น/ชำรุด→เข้ากอง "ต่างยี่ห้อ"/"ชำรุด" แยกไว้รอส่งคืนบริษัท (เปล่าไม่โตกลับ) */
+function custodyAllSizes(){
+ const sizes=[...new Set(db.custody.map(c=>c.size))];
+ return sizes.map(size=>{
+  let borrowed=0, deposited=0;
+  db.custody.filter(c=>c.size===size).forEach(c=>{
+   if(c.type==='ยืม') borrowed+=c.qty;
+   else if(c.type==='คืน') borrowed-=c.qty;
+   else if(c.type==='ฝาก') deposited+=c.qty;
+   else if(c.type==='ถอนฝาก') deposited-=c.qty;
+  });
+  return {size, borrowed, deposited};
+ }).filter(x=>x.borrowed>0||x.deposited>0);
+}
+function custodyOutstandingByCustomer(){
+ const rows=[];
+ db.customers.forEach(c=>{
+  custodySizes(c.id).filter(x=>x.borrowed>0||x.deposited>0).forEach(x=>{
+   rows.push({customerId:c.id, name:c.name, size:x.size, borrowed:x.borrowed, deposited:x.deposited});
+  });
+ });
+ return rows;
+}
+function openSellCirculating(customerId){
+ const custOpts=db.customers.map(c=>`<option value="${c.id}" ${c.id===customerId?'selected':''}>${esc(c.name)}</option>`).join('');
+ showFormPage('ขายถังหมุนเวียน', 'ลูกค้าเอาถังเปล่ามาแลกสด ๆ จ่ายเงิน รับถังกลับไปเลย ไม่มีค้าง', `
+  <div class="fld"><label>ลูกค้า (ไม่บังคับ — เว้นว่างได้ถ้าเป็นลูกค้าจร)</label><select id="sc_cust"><option value="">— ลูกค้าจร —</option>${custOpts}</select></div>
+  <div class="frow">
+   <div class="fld"><label>ขนาดถัง</label><select id="sc_size">${cylinderSizeOptions('น้ำแก๊ส')}</select></div>
+   <div class="fld"><label>จำนวน (ถัง)</label><input id="sc_qty" type="number" min="1" value="1"></div>
+  </div>
+  <div class="fld"><label>ถังเปล่าที่ได้รับคืนจากลูกค้า</label><select id="sc_back">
+   <option value="เรา">ยี่ห้อร้านเรา สภาพดี (เข้าสต๊อกถังเปล่าพร้อมหมุนเวียน)</option>
+   <option value="อื่น">ยี่ห้ออื่น (กองรอส่งคืนบริษัท)</option>
+   <option value="ชำรุด">ชำรุด ใช้ต่อไม่ได้ (กองรอส่งคืนบริษัท)</option>
+  </select></div>
+  <div style="font-size:12.5px;color:var(--muted);margin-top:-4px">ถ้าลูกค้าไม่มีถังมาแลกเลย (ค้างคืน) ให้ใช้ปุ่ม "ยืมถัง" ในหน้าลูกค้าแทน</div>`,
+  null, null, {foot:`<div class="mfoot"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn" onclick="savePress(this,'saveSellCirculating','')">บันทึก</button></div>`});
+}
+function saveSellCirculating(){
+ const customerId=val('sc_cust')||'';
+ const size=val('sc_size'), qty=Number(val('sc_qty')), back=val('sc_back');
+ if(!size || !(qty>0)){ alert('เลือกขนาดและจำนวนให้ถูกต้อง'); return; }
+ const full=db.products.find(p=>p.kind==='น้ำแก๊ส' && p.size===size);
+ if(!full){ alert('ไม่พบน้ำแก๊สขนาดนี้ในระบบ'); return; }
+ const raw=db.products.find(p=>p.kind==='ดิบ');
+ const kgNeed=qty*(Number(full.fillKg)||0);
+ if(!raw || raw.stock<kgNeed){ alert('แก๊สดิบไม่พอ: ต้องใช้ '+kgNeed+' kg เหลือ '+(raw?raw.stock:0)+' kg'); return; }
+ const emptyP=db.products.find(p=>p.kind==='เปล่า' && p.size===size);
+ if(!emptyP || emptyP.stock<qty){ alert('ถังเปล่าพร้อมหมุนเวียน '+size+' ไม่พอ: ต้องใช้ '+qty+' ใบ เหลือ '+(emptyP?emptyP.stock:0)+' ใบ'); return; }
+ const refId=uid();
+ addMove(raw.id, 'เบิกออก', kgNeed, 'ขายถังหมุนเวียน '+size+' x'+qty, {refType:'custody', refId});
+ addMove(emptyP.id, 'เบิกออก', qty, 'ถังหมุนเวียนออก (สวอปทันที) '+size, {refType:'custody', refId});
+ if(back==='เรา'){
+  addMove(emptyP.id, 'รับเข้า', qty, 'รับถังเปล่าคืน (สวอปทันที)', {refType:'custody', refId});
+ }else if(back==='อื่น'){
+  const oth=db.products.find(p=>p.kind==='ต่างยี่ห้อ' && p.size===size);
+  if(oth) addMove(oth.id, 'รับเข้า', qty, 'รับถังต่างยี่ห้อจากลูกค้า (รอส่งคืนบริษัท)', {refType:'custody', refId});
+ }else if(back==='ชำรุด'){
+  const dmg=db.products.find(p=>p.kind==='ชำรุด' && p.size===size);
+  if(dmg) addMove(dmg.id, 'รับเข้า', qty, 'รับถังชำรุดจากลูกค้า (รอส่งคืนบริษัท)', {refType:'custody', refId});
+ }
+ addMoneyRow('เข้า', qty*(Number(full.price)||0), 'ขายถังหมุนเวียน '+size+' x'+qty, {category:'ขาย', refType:'custody', refId});
+ db.custody.push({id:refId, date:todayStr(), customerId, size, type:'หมุนเวียน', qty, note:'สวอปทันที — ได้ถังคืน: '+(back==='เรา'?'ยี่ห้อเรา':back==='อื่น'?'ยี่ห้ออื่น':'ชำรุด')});
+ save(); closeModal();
+ if(customerId) openCustomerDetail(customerId); else render();
+}
+function renderTanks(){
+ const sizes=[...new Set(db.products.filter(p=>p.size && (p.kind==='เปล่า'||p.kind==='น้ำแก๊ส')).map(p=>p.size))];
+ const stockCards=sizes.map(size=>{
+  const emptyP=db.products.find(p=>p.kind==='เปล่า' && p.size===size);
+  const freshP=db.products.find(p=>p.kind==='ใหม่' && p.size===size);
+  const dmgP=db.products.find(p=>p.kind==='ชำรุด' && p.size===size);
+  const othP=db.products.find(p=>p.kind==='ต่างยี่ห้อ' && p.size===size);
+  return `<div class="card" style="padding:14px 16px">
+   <div style="font-weight:700;font-size:14.5px;margin-bottom:10px">${esc(size)}</div>
+   <div style="display:flex;flex-direction:column;gap:6px;font-size:13.5px">
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">พร้อมหมุนเวียน</span><b>${emptyP?emptyP.stock:0} ใบ</b></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">ถังใหม่สำรอง</span><b>${freshP?freshP.stock:0} ใบ</b></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:${dmgP&&dmgP.stock>0?'var(--danger)':'var(--muted)'}">ชำรุดรอคืน</span><b>${dmgP?dmgP.stock:0} ใบ</b></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:${othP&&othP.stock>0?'var(--warn)':'var(--muted)'}">ต่างยี่ห้อรอคืน</span><b>${othP?othP.stock:0} ใบ</b></div>
+   </div>
+   <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+    ${emptyP?`<button class="lnk" style="padding:0;font-size:12.5px" onclick="openMove('${emptyP.id}','รับเข้า')">+รับถังเปล่า</button>`:''}
+    ${freshP?`<button class="lnk" style="padding:0;font-size:12.5px" onclick="openMove('${freshP.id}','รับเข้า')">+รับถังใหม่</button>`:''}
+   </div>
+  </div>`;
+ }).join('');
+
+ const allCust=custodyAllSizes();
+ const custRows=allCust.map(x=>
+  `<tr><td>${esc(x.size)}</td><td class="num">${x.borrowed>0?x.borrowed+' ถัง':'—'}</td><td class="num">${x.deposited>0?x.deposited+' ถัง':'—'}</td></tr>`
+ ).join('');
+
+ const outstanding=custodyOutstandingByCustomer();
+ const outRows=outstanding.map(x=>
+  `<tr><td><button class="lnk" style="padding:0;color:var(--ink)" onclick="openCustomerDetail('${x.customerId}')">${esc(x.name)}</button></td><td>${esc(x.size)}</td><td class="num">${x.borrowed>0?x.borrowed+' ถัง':'—'}</td><td class="num">${x.deposited>0?x.deposited+' ถัง':'—'}</td></tr>`
+ ).join('');
+
+ const history=db.custody.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,30);
+ const histRows=history.map(c=>{
+  const cust=db.customers.find(x=>x.id===c.customerId);
+  const cname=cust?`<button class="lnk" style="padding:0;color:var(--ink)" onclick="openCustomerDetail('${cust.id}')">${esc(cust.name)}</button>`:'ลูกค้าจร';
+  return `<tr><td>${thDate(c.date)}</td><td>${cname}</td><td>${esc(c.type)}</td><td>${esc(c.size)}</td><td class="num">${c.qty} ถัง</td></tr>`;
+ }).join('');
+
+ let html=`<div class="pagehead"><div><h2>ถัง</h2><div class="sub">คลังถังในร้าน + ถังค้างที่ลูกค้าทั้งระบบ</div></div>
+  <button class="btn" onclick="openSellCirculating()">+ ขายถังหมุนเวียน</button></div>`;
+ html+=sizes.length?`<div class="grid g4" style="margin-bottom:18px">${stockCards}</div>`:empty('ยังไม่มีขนาดถังในระบบ');
+ html+=`<h3 style="font-size:16px;margin:22px 0 10px">ถังค้างทั้งระบบ (รวมทุกลูกค้า)</h3>`;
+ html+=custRows?tbl(['ขนาด',['ค้างคืน (ยืม)','num'],['ฝากไว้','num']], custRows):empty('ไม่มีถังยืม/ฝากค้างในระบบตอนนี้');
+ html+=`<h3 style="font-size:16px;margin:22px 0 10px">ลูกค้าที่มีถังค้าง</h3>`;
+ html+=outRows?tbl(['ลูกค้า','ขนาด',['ค้างคืน (ยืม)','num'],['ฝากไว้','num']], outRows):empty('ไม่มีลูกค้าติดค้างถังตอนนี้');
+ html+=`<h3 style="font-size:16px;margin:22px 0 10px">ประวัติธุรกรรมถังล่าสุด</h3>`;
+ html+=histRows?tbl(['วันที่','ลูกค้า','รายการ','ขนาด',['จำนวน','num']], histRows):empty('ยังไม่มีประวัติธุรกรรมถัง');
+ return html;
+}
+registerModule({key:'tanks', ic:'tank', label:'ถัง', render:renderTanks});
 
 /* ============ ก้อนที่ 5: แท็บออเดอร์/ขาย — ปิดออเดอร์แล้วตัดสต๊อกผ่าน addMove จุดเดียว ============ */
 registerModule({key:"orders", ic:"orders", label:"ออเดอร์", render:renderOrders});
@@ -1602,7 +1743,7 @@ function orderItemRow(pid, qty){
  // ถังเปล่า/ถังใหม่/ถังชำรุด (kind='เปล่า'/'ใหม่'/'ชำรุด') ไม่ใช่ของขายหน้าร้านปกติ ไม่โผล่ในหน้าออเดอร์เลย — อยู่แค่ในหน้าลูกค้า (ยืม/คืน/ฝาก/เปลี่ยนถังชำรุด)
  // แก๊สดิบ (kind='ดิบ') คือถังเก็บใหญ่หลังร้าน ไม่ใช่ของขายตรง — ขายเป็น "น้ำแก๊ส" ตามไซส์แล้วระบบตัดจากถังนี้ให้เองตอนปิดออเดอร์
  // ⭐ ไม่โชว์ตัวเลขคงเหลือต่อท้ายชื่อแล้ว (เอาไปดูภาพรวมที่กราฟแดชบอร์ดแทน) — ให้เลือกเร็ว ไม่ต้องอ่านตัวเลขรก
- const opts=db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.kind!=='ชำรุด' && p.kind!=='ดิบ' && (p.active!==false || p.id===pid)).map(p=>
+ const opts=db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.kind!=='ชำรุด' && p.kind!=='ต่างยี่ห้อ' && p.kind!=='ดิบ' && (p.active!==false || p.id===pid)).map(p=>
   `<option value="${p.id}" ${p.id===pid?"selected":""}>${esc(p.name)}</option>`
  ).join("");
  return `<div class="frow oi-row" style="align-items:flex-end;margin-bottom:8px">
@@ -1933,7 +2074,7 @@ function renderDash(){
  const income=db.money.reduce((s,x)=> s + ((x.type==='เข้า' && String(x.date||'').slice(0,7)===mo)?(Number(x.amount)||0):0), 0);
  const pending=db.orders.filter(o=>o.status==='ใหม่').length;
  // เงื่อนไขเดียวกับปุ่ม "สั่งของใกล้หมด" ในแท็บสินค้า — บริการ/ถังชำรุด/น้ำแก๊ส(ไม่มีสต๊อกตัวเอง)/ถังเปล่า/ถังใหม่(ไม่โชว์ในแท็บสินค้าแล้ว) ไม่นับ
- const lowList=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='น้ำแก๊ส' && p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.active!==false && p.stock<=p.lowAt);
+ const lowList=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='ต่างยี่ห้อ' && p.kind!=='น้ำแก๊ส' && p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.active!==false && p.stock<=p.lowAt);
  const sv=stockValueInfo();
  html+=`<div class="grid g4" style="margin-bottom:18px">
   <div class="card stat"><div class="lab">รายรับเดือนนี้</div><b class="money-pos">${baht(income)}</b></div>
