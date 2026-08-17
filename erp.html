@@ -336,8 +336,13 @@ function normalizeDb(){
  if(!Array.isArray(db.vendors)) db.vendors=[];
  if(!Array.isArray(db.pos)) db.pos=[];
  if(!Array.isArray(db.custody)) db.custody=[];   // ยืม/คืน/ฝากถังรายลูกค้า
- // ⭐ migration: สินค้าน้ำแก๊สที่ยังเหลือชื่อเก่า "ถังเต็ม Xkg (แลกถัง)" (จากก่อนแยกน้ำแก๊ส/ถังแก๊ส) → เปลี่ยนเป็น "แก๊ส X กก." ให้ตรงดรอปดาวน์ขายปัจจุบัน
+ // ⭐ migration: สินค้า kind='เต็ม' รุ่นเก่า (ก่อนแยกน้ำแก๊ส/ถังแก๊ส สมัยยังมีขั้น "บรรจุแก๊ส") → ย้ายเป็น kind='น้ำแก๊ส' + ตั้ง fillKg จากขนาดถัง + เปลี่ยนชื่อเป็น "แก๊ส X กก." (คง id เดิมไว้ ไม่กระทบประวัติ order/move ที่ผูกอยู่)
  db.products.forEach(p=>{
+  if(p.kind==='เต็ม'){
+   p.kind='น้ำแก๊ส';
+   const num=String(p.size||"").replace(/kg$/i,"");
+   if(num){ p.name="แก๊ส "+num+" กก."; if(!(Number(p.fillKg)>0)) p.fillKg=Number(num); }
+  }
   if(p.kind==='น้ำแก๊ส' && /ถังเต็ม|แลกถัง/.test(p.name||"")){
    const num=String(p.size||"").replace(/kg$/i,"");
    if(num) p.name="แก๊ส "+num+" กก.";
@@ -1594,9 +1599,10 @@ function renderOrders(){
 }
 
 function orderItemRow(pid, qty){
- // ถังเปล่า/ถังใหม่ (kind='เปล่า'/'ใหม่') ไม่ใช่ของขายหน้าร้านปกติ ไม่โผล่ในหน้าออเดอร์เลย — อยู่แค่ในหน้าลูกค้า (ยืม/คืน/ฝาก/เปลี่ยนถังชำรุด)
+ // ถังเปล่า/ถังใหม่/ถังชำรุด (kind='เปล่า'/'ใหม่'/'ชำรุด') ไม่ใช่ของขายหน้าร้านปกติ ไม่โผล่ในหน้าออเดอร์เลย — อยู่แค่ในหน้าลูกค้า (ยืม/คืน/ฝาก/เปลี่ยนถังชำรุด)
+ // แก๊สดิบ (kind='ดิบ') คือถังเก็บใหญ่หลังร้าน ไม่ใช่ของขายตรง — ขายเป็น "น้ำแก๊ส" ตามไซส์แล้วระบบตัดจากถังนี้ให้เองตอนปิดออเดอร์
  // ⭐ ไม่โชว์ตัวเลขคงเหลือต่อท้ายชื่อแล้ว (เอาไปดูภาพรวมที่กราฟแดชบอร์ดแทน) — ให้เลือกเร็ว ไม่ต้องอ่านตัวเลขรก
- const opts=db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ใหม่' && (p.active!==false || p.id===pid)).map(p=>
+ const opts=db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.kind!=='ชำรุด' && p.kind!=='ดิบ' && (p.active!==false || p.id===pid)).map(p=>
   `<option value="${p.id}" ${p.id===pid?"selected":""}>${esc(p.name)}</option>`
  ).join("");
  return `<div class="frow oi-row" style="align-items:flex-end;margin-bottom:8px">
