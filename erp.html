@@ -1881,7 +1881,8 @@ function renderDash(){
  // ⭐ การ์ดที่กดได้ = clickable (cursor+onclick) เข้าลิสต์จริงที่กรองแล้ว ตัวเลขต้องนับด้วยเงื่อนไขเดียวกับหน้า drill เป๊ะ (กันตัวเลขไม่ตรงกัน)
  const income=db.money.reduce((s,x)=> s + ((x.type==='เข้า' && String(x.date||'').slice(0,7)===mo)?(Number(x.amount)||0):0), 0);
  const pending=db.orders.filter(o=>o.status==='ใหม่').length;
- const lowList=db.products.filter(p=>p.stock<=p.lowAt);
+ // เงื่อนไขเดียวกับปุ่ม "สั่งของใกล้หมด" ในแท็บสินค้า — บริการ/ถังชำรุด/น้ำแก๊ส(ไม่มีสต๊อกตัวเอง)/ถังเปล่า(ไม่โชว์ในแท็บสินค้าแล้ว) ไม่นับ
+ const lowList=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='น้ำแก๊ส' && p.kind!=='เปล่า' && p.active!==false && p.stock<=p.lowAt);
  const sv=stockValueInfo();
  html+=`<div class="grid g4" style="margin-bottom:18px">
   <div class="card stat"><div class="lab">รายรับเดือนนี้</div><b class="money-pos">${baht(income)}</b></div>
