@@ -610,12 +610,13 @@ function prodStatus(p){
 registerModule({key:"products", ic:"products", label:"สินค้า", render:renderProducts});
 
 function renderProducts(){
- // ⭐ แท็บนี้เน้น "ขายน้ำแก๊ส" ล้วนๆ — ถังเปล่า (kind='เปล่า') ไม่ใช่ของขาย ผูกกับระบบยืม/คืน/ฝากถังของลูกค้าเท่านั้น
- //   จึงไม่โชว์ในรายการนี้ (ยังแก้ยอดได้ผ่าน "ตรวจนับสต๊อก" ถ้าจำเป็น) — รอทำเป็นเมนู "ระบบถัง" แยกต่างหากทีหลัง
- const visible=db.products.filter(p=>p.kind!=='เปล่า');
+ // ⭐ แท็บนี้เน้น "ขายน้ำแก๊ส" ล้วนๆ — ถังเปล่า/ถังใหม่ (kind='เปล่า'/'ใหม่') ไม่ใช่ของขายหน้าร้านปกติ
+ //   ถังเปล่าผูกกับระบบยืม/คืน/ฝากถังของลูกค้า · ถังใหม่ใช้เฉพาะตอน "เปลี่ยนถังชำรุด" ในหน้าลูกค้า
+ //   จึงไม่โชว์ทั้งคู่ในรายการนี้ (ยังแก้ยอดได้ผ่าน "ตรวจนับสต๊อก" ถ้าจำเป็น) — รอทำเป็นเมนู "ระบบถัง" แยกต่างหากทีหลัง
+ const visible=db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ใหม่');
  // น้ำแก๊สไม่นับเป็น "ของใกล้หมด" ที่ต้องสั่งซื้อ — ตัวจริงที่ต้องเติมคือแก๊สดิบ ซึ่งจะเตือนของมันเองอยู่แล้ว
  const lowCount=visible.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='น้ำแก๊ส' && p.active!==false && p.stock<=p.lowAt).length;
- let html=`<div class="pagehead"><div><h2>สินค้า</h2><div class="sub">ทะเบียนสินค้าและคงเหลือ (น้ำแก๊ส/ถังใหม่/อุปกรณ์/บริการ)</div></div>
+ let html=`<div class="pagehead"><div><h2>สินค้า</h2><div class="sub">ทะเบียนสินค้าและคงเหลือ (น้ำแก๊ส/อุปกรณ์/บริการ)</div></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
    ${lowCount?`<button class="btn ghost" style="color:var(--warn);border-color:var(--warn)" onclick="createPoFromLowStock()">สั่งของใกล้หมด (${lowCount})</button>`:''}
    <button class="btn ghost" onclick="openStocktake()">ตรวจนับสต๊อก</button>
@@ -791,6 +792,42 @@ function gasAvailable(p){
  const raw=db.products.find(x=>x.kind==='ดิบ');
  if(!raw || !(Number(p.fillKg)>0)) return 0;
  return Math.floor((Number(raw.stock)||0)/Number(p.fillKg));
+}
+
+/* ⭐ กราฟวงกลมยอดแก๊สคงเหลือ (แดชบอร์ด) — คงเหลือ vs ขายไปแล้ว คำนวณจากแก๊สดิบล้วนๆ
+   ขายไปแล้ว = ผลรวม "รับเข้า/ปรับเพิ่ม" ทั้งหมดที่เคยมี ลบด้วยคงเหลือตอนนี้ (ไม่เก็บเป็นตัวเลขแยก คำนวณสดทุกครั้ง) */
+function gasChartInfo(){
+ const raw=db.products.find(p=>p.kind==='ดิบ');
+ if(!raw) return null;
+ const received=db.moves.filter(m=>m.productId===raw.id && (m.type==='รับเข้า'||m.type==='ปรับเพิ่ม')).reduce((s,m)=>s+(Number(m.qty)||0),0);
+ const remaining=Math.max(0, Number(raw.stock)||0);
+ const used=Math.max(0, received-remaining);
+ return {raw, remaining, used, total:remaining+used};
+}
+function gasChartCard(){
+ const info=gasChartInfo();
+ if(!info) return '';
+ const {raw, remaining, used, total}=info;
+ const R=50, C=2*Math.PI*R;
+ const remLen = total>0 ? C*(remaining/total) : 0;
+ const usedLen = total>0 ? C*(used/total) : 0;
+ const svg = total>0 ? `
+   <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--line)" stroke-width="16"/>
+   <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--accent)" stroke-width="16"
+    stroke-dasharray="${usedLen} ${C-usedLen}" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+   <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--ok)" stroke-width="16"
+    stroke-dasharray="${remLen} ${C-remLen}" stroke-dashoffset="${-usedLen}" transform="rotate(-90 60 60)"/>`
+  : `<circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--line)" stroke-width="16"/>`;
+ return `<div class="card" style="margin-bottom:18px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+   <svg viewBox="0 0 120 120" width="120" height="120" style="flex:none">${svg}</svg>
+   <div style="flex:1;min-width:180px">
+    <div style="font-size:13.5px;font-weight:700;margin-bottom:10px">ยอดแก๊สคงเหลือ (${esc(raw.name)})</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+     <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--ok);margin-right:6px"></span>คงเหลือ <b>${remaining.toLocaleString('th-TH')} kg</b></div>
+     <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--accent);margin-right:6px"></span>ขายไปแล้ว <b>${used.toLocaleString('th-TH')} kg</b></div>
+    </div>
+   </div>
+  </div>`;
 }
 
 function saveMove(key){
@@ -1176,7 +1213,7 @@ function openPoDetail(id){
 
 /* ⭐ ปุ่มลัดจากการ์ด "ของใกล้หมด" — prefill qty ให้พอกลับไป 2 เท่าของ lowAt, price = cost ปัจจุบัน */
 function createPoFromLowStock(){
- const low=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='เปล่า' && p.active!==false && p.stock<=p.lowAt);
+ const low=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.active!==false && p.stock<=p.lowAt);
  if(!low.length){ alert('ตอนนี้ไม่มีสินค้าใกล้หมด'); return; }
  const items=low.map(p=>({productId:p.id, name:p.name, qty:Math.max(1, p.lowAt*2-p.stock), price:Number(p.cost)||0}));
  openPoForm('', '', items);
@@ -1550,11 +1587,11 @@ function renderOrders(){
 }
 
 function orderItemRow(pid, qty){
- // ถังเปล่า (kind='เปล่า') ไม่ใช่ของขาย ไม่โผล่ในหน้าออเดอร์เลย — อยู่แค่ในระบบยืม/คืน/ฝากถังของลูกค้า
- const opts=db.products.filter(p=>p.kind!=='เปล่า' && (p.active!==false || p.id===pid)).map(p=>{
-  const label = p.kind==='บริการ' ? esc(p.name) : esc(p.name)+' (คงเหลือ '+gasAvailable(p)+' '+esc(p.unit)+')';
-  return `<option value="${p.id}" ${p.id===pid?"selected":""}>${label}</option>`;
- }).join("");
+ // ถังเปล่า/ถังใหม่ (kind='เปล่า'/'ใหม่') ไม่ใช่ของขายหน้าร้านปกติ ไม่โผล่ในหน้าออเดอร์เลย — อยู่แค่ในหน้าลูกค้า (ยืม/คืน/ฝาก/เปลี่ยนถังชำรุด)
+ // ⭐ ไม่โชว์ตัวเลขคงเหลือต่อท้ายชื่อแล้ว (เอาไปดูภาพรวมที่กราฟแดชบอร์ดแทน) — ให้เลือกเร็ว ไม่ต้องอ่านตัวเลขรก
+ const opts=db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ใหม่' && (p.active!==false || p.id===pid)).map(p=>
+  `<option value="${p.id}" ${p.id===pid?"selected":""}>${esc(p.name)}</option>`
+ ).join("");
  return `<div class="frow oi-row" style="align-items:flex-end;margin-bottom:8px">
    <div class="fld" style="flex:2;margin-bottom:0"><select class="oi-prod"><option value="">— เลือกสินค้า —</option>${opts}</select></div>
    <div class="fld" style="flex:1;margin-bottom:0"><input class="oi-qty" type="number" min="1" placeholder="จำนวน" value="${qty>0?qty:""}"></div>
@@ -1875,14 +1912,15 @@ function renderDash(){
    </div></div>`;
  }
  let html=head('แดชบอร์ด','ภาพรวมร้าน '+esc(db.shopName));   // ไม่มีปุ่มเพิ่ม — อ่านอย่างเดียว
+ html+=gasChartCard();   // ⭐ กราฟวงกลมยอดแก๊สคงเหลือ — วางเป็นการ์ดแรกสุดของแดชบอร์ดตามที่ขอ
  const mo=todayStr().slice(0,7);
 
  // การ์ดสรุป — คำนวณสดจาก db ทุกครั้งตอน render ไม่เก็บค่าซ้ำ
  // ⭐ การ์ดที่กดได้ = clickable (cursor+onclick) เข้าลิสต์จริงที่กรองแล้ว ตัวเลขต้องนับด้วยเงื่อนไขเดียวกับหน้า drill เป๊ะ (กันตัวเลขไม่ตรงกัน)
  const income=db.money.reduce((s,x)=> s + ((x.type==='เข้า' && String(x.date||'').slice(0,7)===mo)?(Number(x.amount)||0):0), 0);
  const pending=db.orders.filter(o=>o.status==='ใหม่').length;
- // เงื่อนไขเดียวกับปุ่ม "สั่งของใกล้หมด" ในแท็บสินค้า — บริการ/ถังชำรุด/น้ำแก๊ส(ไม่มีสต๊อกตัวเอง)/ถังเปล่า(ไม่โชว์ในแท็บสินค้าแล้ว) ไม่นับ
- const lowList=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='น้ำแก๊ส' && p.kind!=='เปล่า' && p.active!==false && p.stock<=p.lowAt);
+ // เงื่อนไขเดียวกับปุ่ม "สั่งของใกล้หมด" ในแท็บสินค้า — บริการ/ถังชำรุด/น้ำแก๊ส(ไม่มีสต๊อกตัวเอง)/ถังเปล่า/ถังใหม่(ไม่โชว์ในแท็บสินค้าแล้ว) ไม่นับ
+ const lowList=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='น้ำแก๊ส' && p.kind!=='เปล่า' && p.kind!=='ใหม่' && p.active!==false && p.stock<=p.lowAt);
  const sv=stockValueInfo();
  html+=`<div class="grid g4" style="margin-bottom:18px">
   <div class="card stat"><div class="lab">รายรับเดือนนี้</div><b class="money-pos">${baht(income)}</b></div>
