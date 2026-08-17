@@ -609,15 +609,18 @@ function prodStatus(p){
 registerModule({key:"products", ic:"products", label:"สินค้า", render:renderProducts});
 
 function renderProducts(){
- const lowCount=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.active!==false && p.stock<=p.lowAt).length;
- let html=`<div class="pagehead"><div><h2>สินค้า</h2><div class="sub">ทะเบียนสินค้าและคงเหลือ</div></div>
+ // ⭐ แท็บนี้เน้น "ขายน้ำแก๊ส" ล้วนๆ — ถังเปล่า (kind='เปล่า') ไม่ใช่ของขาย ผูกกับระบบยืม/คืน/ฝากถังของลูกค้าเท่านั้น
+ //   จึงไม่โชว์ในรายการนี้ (ยังแก้ยอดได้ผ่าน "ตรวจนับสต๊อก" ถ้าจำเป็น) — รอทำเป็นเมนู "ระบบถัง" แยกต่างหากทีหลัง
+ const visible=db.products.filter(p=>p.kind!=='เปล่า');
+ const lowCount=visible.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.active!==false && p.stock<=p.lowAt).length;
+ let html=`<div class="pagehead"><div><h2>สินค้า</h2><div class="sub">ทะเบียนสินค้าและคงเหลือ (น้ำแก๊ส/ถังใหม่/อุปกรณ์/บริการ)</div></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
    ${lowCount?`<button class="btn ghost" style="color:var(--warn);border-color:var(--warn)" onclick="createPoFromLowStock()">สั่งของใกล้หมด (${lowCount})</button>`:''}
    <button class="btn ghost" onclick="openStocktake()">ตรวจนับสต๊อก</button>
    <button class="btn" onclick="openProductForm()">+ เพิ่ม</button>
   </div></div>`;
- if(!db.products.length) return html+empty("ยังไม่มีสินค้า — กดปุ่ม + เพิ่ม");
- const rows=db.products.map(p=>{
+ if(!visible.length) return html+empty("ยังไม่มีสินค้า — กดปุ่ม + เพิ่ม");
+ const rows=visible.map(p=>{
   const st=prodStatus(p);
   const isSvc=p.kind==='บริการ';
   const profit=(Number(p.price)||0)-(Number(p.cost)||0);   // คำนวณสดตอน render — ไม่เก็บลง db
@@ -1189,7 +1192,7 @@ function openPoDetail(id){
 
 /* ⭐ ปุ่มลัดจากการ์ด "ของใกล้หมด" — prefill qty ให้พอกลับไป 2 เท่าของ lowAt, price = cost ปัจจุบัน */
 function createPoFromLowStock(){
- const low=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.active!==false && p.stock<=p.lowAt);
+ const low=db.products.filter(p=>p.kind!=='บริการ' && p.kind!=='ชำรุด' && p.kind!=='เปล่า' && p.active!==false && p.stock<=p.lowAt);
  if(!low.length){ alert('ตอนนี้ไม่มีสินค้าใกล้หมด'); return; }
  const items=low.map(p=>({productId:p.id, name:p.name, qty:Math.max(1, p.lowAt*2-p.stock), price:Number(p.cost)||0}));
  openPoForm('', '', items);
