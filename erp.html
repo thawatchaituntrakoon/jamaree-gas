@@ -1218,6 +1218,8 @@ function recalcQuickGas(){
  const box=document.getElementById('qg_avg');
  if(box) box.textContent=baht(kg*price);
 }
+/* ⭐ รับแก๊สดิบด่วนก็สร้างใบสั่งซื้อ (po) ให้อัตโนมัติ (สถานะ 'รับแล้ว' เลย ไม่มีผู้ขายผูกไว้)
+   เพื่อให้ไปโผล่ในแท็บ "จัดซื้อ" ด้วย — จะได้มีที่เดียวสำหรับดูประวัติจัดซื้อทั้งหมด ไม่ว่าจะผ่าน PO เต็มรูปหรือซื้อสดหน้างาน */
 function saveQuickGasReceive(){
  const raw=db.products.find(p=>p.kind==='ดิบ');
  if(!raw) return;
@@ -1225,10 +1227,12 @@ function saveQuickGasReceive(){
  const price=Number(val('qg_price'));
  if(!(kg>0)){ alert('กรอกน้ำหนักที่รับให้ถูกต้อง'); return; }
  const note=val('qg_note')||'รับแก๊สดิบด่วน';
- addMove(raw.id, 'รับเข้า', kg, note);
+ const refId=uid();
+ addMove(raw.id, 'รับเข้า', kg, note, {refType:'po', refId});
  const amt=kg*price;
- if(amt>0) addMoneyRow('ออก', amt, note+' ('+kg+' kg x '+baht(price)+'/kg)', {category:'วัตถุดิบ'});
+ if(amt>0) addMoneyRow('ออก', amt, note+' ('+kg+' kg x '+baht(price)+'/kg)', {category:'วัตถุดิบ', refType:'po', refId});
  if(price>0) raw.cost=price;   // จำราคาล่าสุดไว้ใช้ครั้งถัดไป
+ db.pos.unshift({id:refId, number:nextPoNumber(), vendorId:null, date:todayStr(), items:[{productId:raw.id, name:raw.name, qty:kg, price, received:kg}], status:'รับแล้ว', receivedAt:todayStr(), note:note+' (ซื้อสดหน้างาน ไม่ผ่านผู้ขาย)'});
  closeModal(); render();
 }
 
