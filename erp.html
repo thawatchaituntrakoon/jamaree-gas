@@ -2148,7 +2148,7 @@ function renderDash(){
  const onLeaveToday=db.staff.filter(s=>db.leaves.some(l=>l.staffId===s.id && l.dateFrom<=todayStr() && l.dateTo>=todayStr())).length;
  const poPending=(db.pos||[]).filter(po=>po.status==='สั่งแล้ว').length;
  html+=`<div class="grid g4" style="margin-top:14px">
-  <div class="card stat" style="cursor:pointer" onclick="openArDrill()"><div class="lab">ลูกหนี้ค้าง (ใบแจ้งหนี้ยังไม่ชำระ)</div><b class="${arTotal>0?'money-neg':''}">${baht(arTotal)}</b></div>
+  <div class="card stat" style="cursor:pointer" onclick="openArDrill()"><div class="lab">ลูกหนี้ค้าง (ใบแจ้งหนี้ + ออเดอร์ค้างชำระ)</div><b class="${arTotal>0?'money-neg':''}">${baht(arTotal)}</b></div>
   <div class="card stat" style="cursor:pointer" onclick="openDraftDocsDrill()"><div class="lab">เอกสารร่างค้าง</div><b>${draftDocs}</b></div>
   <div class="card stat" style="cursor:pointer" onclick="openLeaveTodayDrill()"><div class="lab">พนักงานลาวันนี้</div><b>${onLeaveToday}</b></div>
   <div class="card stat" style="cursor:pointer" onclick="go('purchases')"><div class="lab">PO ค้างรับ</div><b>${poPending}</b></div>
