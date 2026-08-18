@@ -750,6 +750,19 @@ function paintShop(){
  if(mk) mk.innerHTML = db.logo ? `<img src="${db.logo}" alt="โลโก้" style="width:100%;height:100%;object-fit:contain;border-radius:8px">` : esc((db.shopName||"ร").trim().charAt(0));
 }
 
+/* ⭐ ตัวแปรสถานะโหมด POS ต้องประกาศตรงนี้ (ก่อน init() ถูกเรียกที่ล่างสุดของบล็อกนี้)
+   เพราะ init() เรียก initPos()/renderPosApp() ทันทีเมื่อ ?pos=1 — ถ้า let พวกนี้อยู่หลัง
+   จุดที่ init() ถูกเรียก (เช่นไปประกาศไว้ใกล้โค้ดโมดูล POS ท้ายไฟล์) จะโดน TDZ (ReferenceError) */
+let posTab='sell';
+let posCart=[];
+let posCustomerId='';
+let posActiveCat=null;
+let posPayCash=0, posPayTransfer=0;
+let posPickerTarget='cart';
+let posTankCustomerId='';
+let posCustodyAction=null, posCustodySize=null, posCustodyQty=1;
+let posNumpadField=null, posNumpadValue='';
+
 function init(){
  load();
  // ⭐ โหมด "ขายหน้าร้าน" (?pos=1) แยกจอทั้งหมด ไม่แตะ/ไม่วาดโครงหลังบ้านเลย (sidebar/tabs/render เดิม) ข้อมูล db เดียวกัน
@@ -4842,16 +4855,7 @@ registerModule({key:'board', ic:'board', label:'บอร์ดงาน', rende
    "แก้บิล" ทำแบบแก้ในบิลเดิมไม่ได้ (สต๊อก/เงินตัดจริงไปแล้ว) ให้ "ยกเลิกบิล" (คืนสต๊อก+ลบยอดเงินของบิลนั้น)
    แล้วขายใหม่แทน ปลอดภัยกว่า ตัวเลขบัญชีไม่มั่ว ============================================================ */
 function isPosMode(){ return new URLSearchParams(location.search).get('pos')==='1'; }
-
-let posTab='sell';
-let posCart=[];               // [{id,name,unit,price,qty}] — price = ราคาตามชุดลูกค้า ณ ตอนหยิบใส่ตะกร้า
-let posCustomerId='';         // '' = ลูกค้าจร
-let posActiveCat=null;
-let posPayCash=0, posPayTransfer=0;
-let posPickerTarget='cart';
-let posTankCustomerId='';
-let posCustodyAction=null, posCustodySize=null, posCustodyQty=1;
-let posNumpadField=null, posNumpadValue='';
+// ตัวแปรสถานะ (posTab, posCart, posCustomerId, ...) ประกาศไว้ก่อน function init() ด้านบน — ดูคอมเมนต์ตรงนั้น
 
 function posSellableProducts(){
  return db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ชำรุด' && p.kind!=='ต่างยี่ห้อ' && p.kind!=='ดิบ' && p.active!==false);
