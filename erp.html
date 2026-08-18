@@ -243,6 +243,9 @@ input[type=number]{-moz-appearance:textfield}
 body.pos-active .app-shell{display:none}
 body.pos-active #posRoot{display:flex;flex-direction:column;height:100vh;background:var(--paper)}
 body.pos-active{overscroll-behavior:none}
+/* ⭐ touch-action:manipulation กันเบราว์เซอร์มือถือตีความแตะเป็นท่าสกรอลล์/ซูมแล้วยกเลิก click event
+   (ปุ่มเล็กๆ อยู่ในโซนเลื่อนได้ เช่น −/+ ในตะกร้า เจอปัญหานี้บ่อยสุด — นิ้วสั่นนิดเดียวปุ่มไม่ตอบ) */
+#posRoot button{touch-action:manipulation}
 
 .pos-top{display:flex;align-items:center;gap:18px;padding:14px 24px;background:var(--card);border-bottom:1px solid var(--line);flex:none}
 .pos-brand{display:flex;align-items:center;gap:12px;flex:none}
@@ -273,21 +276,25 @@ body.pos-active{overscroll-behavior:none}
 .pos-prod-unit{font-size:12.5px;color:var(--faint)}
 .pos-empty{color:var(--faint);text-align:center;padding:40px 20px;font-size:14px;line-height:1.8}
 
-.pos-cart{width:400px;flex:none;background:var(--card);border-left:1px solid var(--line);display:flex;flex-direction:column;height:100%}
+.pos-cart{width:400px;flex:none;background:var(--card);border-left:1px solid var(--line);display:flex;flex-direction:column;height:100%;overflow-y:auto}
 .pos-cart-customer{padding:18px 20px;border-bottom:1px solid var(--line);flex:none}
 .pos-cust-label{font-size:12px;font-weight:700;color:var(--faint);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
 .pos-cust-picker{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--paper);border:1.5px solid var(--line);border-radius:13px;padding:15px 16px;font-size:15.5px;font-weight:700;color:var(--ink);min-height:56px}
 .pos-cust-picker .chev{color:var(--faint);font-size:13px;font-weight:600}
-.pos-cart-list{flex:1;overflow-y:auto;padding:6px 20px}
+/* ⭐ min-height กันบั๊ก: flex:1+overflow-y:auto ทำให้ auto-min-size ของ flex item นี้กลายเป็น 0 ตาม spec
+   พอ .pos-pay-section (โซนชำระเงิน) ต้องการพื้นที่เยอะ รายการตะกร้าเลยถูกบีบจนสูง ~12px มองไม่เห็นปุ่ม −/+ เลย
+   (กดเพิ่มยังทำงานได้เพราะปุ่ม + อยู่ที่การ์ดสินค้าฝั่งซ้าย คนละปุ่มกับ −/+ ในตะกร้านี้) */
+.pos-cart-list{flex:1;overflow-y:auto;padding:6px 20px;min-height:104px}
 .pos-cart-item{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--line)}
 .pos-cart-item:last-child{border-bottom:none}
 .pos-ci-info{flex:1;min-width:0}
 .pos-ci-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pos-ci-price{font-size:12.5px;color:var(--muted);margin-top:2px}
 .pos-ci-qty{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:99px;flex:none}
-.pos-ci-qty button{width:38px;height:38px;border:none;background:none;color:var(--ink);font-size:19px;font-weight:700}
+.pos-ci-qty button{width:52px;height:52px;border:none;background:none;color:var(--ink);font-size:23px;font-weight:700}
+.pos-ci-qty button:active{background:var(--paper)}
 .pos-ci-qty button:first-child{color:var(--danger)}
-.pos-ci-qty .q{width:28px;text-align:center;font-weight:700;font-size:15px}
+.pos-ci-qty .q{width:32px;text-align:center;font-weight:700;font-size:16px}
 .pos-ci-total{width:72px;text-align:right;font-weight:700;font-size:15px;flex:none}
 .pos-cart-summary{padding:14px 20px 6px;flex:none}
 .pos-cart-summary .row{display:flex;justify-content:space-between;align-items:baseline;font-size:14.5px;color:var(--muted)}
