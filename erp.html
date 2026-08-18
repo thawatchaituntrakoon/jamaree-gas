@@ -766,7 +766,10 @@ let posNumpadField=null, posNumpadValue='';
 function init(){
  load();
  // ⭐ โหมด "ขายหน้าร้าน" (?pos=1) แยกจอทั้งหมด ไม่แตะ/ไม่วาดโครงหลังบ้านเลย (sidebar/tabs/render เดิม) ข้อมูล db เดียวกัน
- if(isPosMode()){ initPos(); return; }
+ // ⭐ ต้อง setTimeout ไม่เรียก initPos() ตรงๆ — init() ถูกเรียกตั้งแต่ต้นไฟล์ (ก่อน registerModule()/seed IIFE ท้ายไฟล์ทำงาน)
+ //   ฝั่งหลังบ้านไม่เจอปัญหาเพราะ registerModule() เช็ค window.__ready แล้ว re-render ให้เองทุกครั้งที่มีโมดูลใหม่ (self-healing)
+ //   แต่ initPos()/renderPosApp() ไม่มีกลไกแบบนั้น เรียกตรงๆ ตอนนี้จะวาดจากข้อมูล seed ที่ยังว่างเปล่าอยู่ ต้องรอให้สคริปต์ทั้งไฟล์รันจบก่อน (tick ถัดไป) ค่อยวาด
+ if(isPosMode()){ setTimeout(initPos, 0); return; }
  paintShop();
  document.getElementById("shopName").onclick=editShop;
  window.__ready=true;
