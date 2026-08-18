@@ -2331,6 +2331,9 @@ function tankIncomeInRange(startDate, endDate){
  return db.money.filter(m=>m.type==='เข้า' && m.refType==='custody' && m.date>=startDate && m.date<=endDate).reduce((s,m)=>s+(Number(m.amount)||0),0);
 }
 function thDateShort(s){ if(!s) return ''; const[,m,d]=s.split('-'); return d+'/'+m; }
+/* ⭐ ใช้แทน .toISOString().slice(0,10) เสมอเวลาแปลง Date กลับเป็นสตริงวันที่ — toISOString() แปลงเป็น UTC ก่อน
+   เมืองไทย (UTC+7) เลยเพี้ยนถอยหลัง 1 วันตอนตีเที่ยงคืนแปลงกลับ (พังกับ weekRange/monthRange โดยเฉพาะ) ต้องอ่านปี/เดือน/วันแบบ local เท่านั้น */
+function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function weekRange(anchorDate){
  // จันทร์-อาทิตย์ของสัปดาห์ที่มี anchorDate อยู่
  const d=new Date(anchorDate+'T00:00:00');
@@ -2338,7 +2341,7 @@ function weekRange(anchorDate){
  const diffToMon=(day===0?-6:1-day);
  const mon=new Date(d); mon.setDate(d.getDate()+diffToMon);
  const sun=new Date(mon); sun.setDate(mon.getDate()+6);
- return {start:mon.toISOString().slice(0,10), end:sun.toISOString().slice(0,10)};
+ return {start:ymd(mon), end:ymd(sun)};
 }
 function monthRange(ym){
  const [y,m]=ym.split('-').map(Number);
@@ -2422,7 +2425,7 @@ function renderWeekReport(){
  const bars=[];
  for(let i=weeksBack-1;i>=0;i--){
   const anchor=new Date(curWeek.start+'T00:00:00'); anchor.setDate(anchor.getDate()-7*i);
-  const wk=weekRange(anchor.toISOString().slice(0,10));
+  const wk=weekRange(ymd(anchor));
   const data=periodSalesData(wk.start, wk.end);
   bars.push({label:thDateShort(wk.start), value:data.sales, wk, data});
  }
