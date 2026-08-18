@@ -365,6 +365,10 @@ function normalizeDb(){
    const gas15=db.products.find(p=>p.kind==='น้ำแก๊ส' && p.size==='15kg');
    db.products.push({id:uid(), sku:'SWP-15', name:'ถังหมุนเวียน 15 กก.', unit:'ถัง', stock:0, lowAt:0, price:gas15?gas15.price:380, cost:gas15?gas15.cost:1170, kind:'หมุนเวียน', size:'15kg', fillKg:15, active:true});
   }
+  // ⭐ migration: จัดกลุ่มอุปกรณ์เดิม (หัวเร็กเกอเลเตอร์/สายยางแก๊ส) เข้าประเภท "อุปกรณ์แก๊ส" ให้ร้านเก่าที่ยังไม่มี kind (สร้างก่อนมีประเภทนี้)
+  db.products.forEach(p=>{
+   if((p.sku==='EQ-REG'||p.sku==='EQ-HOSE') && !p.kind) p.kind='อุปกรณ์แก๊ส';
+  });
  })();
  db.pos.forEach(po=>{
   if(!Array.isArray(po.items)) po.items=[];
@@ -621,8 +625,8 @@ init();
   {id:uid(), sku:"CYL-15-NEW", name:"ถังใหม่ 15kg", unit:"ถัง", stock:5, lowAt:2, price:1280, cost:1150, kind:"ใหม่", size:"15kg", active:true},
   {id:uid(), sku:"GAS-48", name:"แก๊ส 48 กก.", unit:"ถัง", stock:0, lowAt:2, price:1150, cost:3064, kind:"น้ำแก๊ส", size:"48kg", fillKg:48, active:true},
   {id:uid(), sku:"CYL-48-E", name:"ถังเปล่า 48kg", unit:"ถัง", stock:4, lowAt:2, price:0, cost:2200, kind:"เปล่า", size:"48kg", active:true},
-  {id:uid(), sku:"EQ-REG", name:"หัวเร็กเกอเลเตอร์", unit:"ชิ้น", stock:12, lowAt:3, price:250, cost:150, active:true},
-  {id:uid(), sku:"EQ-HOSE", name:"สายยางแก๊ส", unit:"เมตร", stock:30, lowAt:10, price:60, cost:35, active:true},
+  {id:uid(), sku:"EQ-REG", name:"หัวเร็กเกอเลเตอร์", unit:"ชิ้น", stock:12, lowAt:3, price:250, cost:150, kind:"อุปกรณ์แก๊ส", active:true},
+  {id:uid(), sku:"EQ-HOSE", name:"สายยางแก๊ส", unit:"เมตร", stock:30, lowAt:10, price:60, cost:35, kind:"อุปกรณ์แก๊ส", active:true},
   {id:uid(), sku:"SVC-VALVE", name:"ซ่อมวาล์ว", unit:"ครั้ง", stock:0, lowAt:0, price:150, cost:50, kind:"บริการ", active:true},
   {id:uid(), sku:"DMG-4", name:"ถังชำรุด 4kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ชำรุด", size:"4kg", active:true},
   {id:uid(), sku:"DMG-11.5", name:"ถังชำรุด 11.5kg", unit:"ถัง", stock:0, lowAt:0, price:0, cost:0, kind:"ชำรุด", size:"11.5kg", active:true},
