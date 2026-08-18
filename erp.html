@@ -233,6 +233,9 @@ td.act{white-space:nowrap}
 .fld label{font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--muted);margin-bottom:6px;display:block}
 .fld input,.fld select,.fld textarea{border-radius:10px;border:1.5px solid rgba(26,32,50,.12);padding:10px 12px;font-size:14px}
 .fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+/* ⭐ ปิดปุ่ม +/- บนช่องตัวเลขทั้งแอป — เลขเงินหลักพันกดทีละ 1 ไม่ไหว ให้พิมพ์กรอกตรงๆ อย่างเดียว */
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
 .mfoot{display:flex;gap:9px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid rgba(26,32,50,.08)}
 </style>
 </head>
@@ -1941,7 +1944,7 @@ function openOrderDetail(id){
    ${o.paidCash>0?`สด ${baht(o.paidCash)}<br>`:''}
    ${o.paidTransfer>0?`โอน ${baht(o.paidTransfer)}<br>`:''}
    ${payRemain>0?`<span style="color:var(--warn);font-weight:600">ค้างชำระ ${baht(payRemain)}</span>`:(payPaid>0?'<span style="color:var(--ok)">จ่ายครบแล้ว</span>':'')}
-   ${unpaidMoneyRow?`<div style="margin-top:6px"><button class="lnk" style="color:var(--ok);padding:0" onclick="markBillPaid('${unpaidMoneyRow.id}'); openOrderDetail('${id}')">รับชำระค้าง</button></div>`:''}
+   ${unpaidMoneyRow?`<div style="margin-top:6px"><button class="lnk" style="color:var(--ok);padding:0" onclick="openCollectPayment('${unpaidMoneyRow.id}', 'openOrderDetail(&apos;${id}&apos;)')">รับชำระ</button></div>`:''}
   </div>`;
 
  showDetailPage(`ออเดอร์ ${thDate(o.date)}`, c?esc(c.name):'—', `
@@ -2192,7 +2195,7 @@ function openArDrill(){
    <td>${c?`<button class="lnk" style="padding:0;color:var(--ink)" onclick="openCustomerDetail('${c.id}')">${esc(c.name)}</button>`:'ลูกค้าจร'}</td>
    <td>${thDate(m.date)}</td>
    <td class="num">${baht(m.amount)}</td>
-   <td class="act"><button class="lnk" style="color:var(--ok)" onclick="markBillPaid('${m.id}'); openArDrill()">รับชำระ</button></td>
+   <td class="act"><button class="lnk" style="color:var(--ok)" onclick="openCollectPayment('${m.id}', 'openArDrill()')">รับชำระ</button></td>
   </tr>`;
  });
  const rows=invRows.concat(orderRows).join('');
@@ -2293,6 +2296,35 @@ function markBillPaid(id){
  const m=db.money.find(x=>x.id===id);
  if(!m || !m.unpaid) return;
  m.unpaid=false; save(); render();
+}
+
+/* ⭐ รับชำระค้าง (ลูกหนี้จากออเดอร์) แบบทยอยจ่ายได้ — กรอกยอดที่ได้จริงวันนี้ ไม่ต้องเท่ากับยอดค้างทั้งหมด
+   จ่ายครบ → ปิดยอดค้างแถวเดิมเลย (เหมือน markBillPaid) · จ่ายไม่ครบ → หักยอดค้างแถวเดิมลง + แตกแถว "เข้า" ใหม่ (จ่ายแล้ว) สำหรับยอดที่รับวันนี้โดยเฉพาะ วันที่ = วันนี้จริง (แถวเดิมยังเก็บวันที่ขายไว้เหมือนเดิม)
+   returnCall = สตริงโค้ด JS ระบุว่ากลับไปหน้าไหนหลังบันทึก (เช่น "openOrderDetail('xxx')" / "openArDrill()") */
+function openCollectPayment(moneyId, returnCall){
+ const m=db.money.find(x=>x.id===moneyId);
+ if(!m || !m.unpaid) return;
+ showFormPage('รับชำระ', 'ยอดค้างอยู่ '+baht(m.amount), `
+  <div class="fld"><label>จำนวนที่ชำระวันนี้ (บาท)</label><input id="cp_amt" type="number" min="1" max="${m.amount}" value="${m.amount}"></div>
+  <input type="hidden" id="cp_return" value="${esc(returnCall||'')}">`,
+  null, null, {foot:`<div class="mfoot"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn" onclick="savePress(this,'saveCollectPayment','${moneyId}')">บันทึก</button></div>`,
+  backFn: returnCall||undefined});
+}
+function saveCollectPayment(moneyId){
+ const m=db.money.find(x=>x.id===moneyId);
+ if(!m || !m.unpaid) return;
+ const amt=Number(val('cp_amt'))||0;
+ if(!(amt>0)){ alert('กรอกจำนวนเงินให้ถูกต้อง'); return; }
+ if(amt>=m.amount){
+  m.unpaid=false;
+ }else{
+  m.amount-=amt;
+  addMoneyRow('เข้า', amt, (m.note||'ขายออเดอร์')+' (รับชำระบางส่วน)', {category:m.category||'ขาย', refType:m.refType, refId:m.refId});
+ }
+ save();
+ const ret=val('cp_return');
+ closeModal();
+ if(ret){ try{ new Function(ret)(); }catch(e){} }
 }
 
 function pad3(n){ return String(n).padStart(3,'0'); }
