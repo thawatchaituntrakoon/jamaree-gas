@@ -1712,6 +1712,13 @@ function orderProfit(o){
    ปิดออเดอร์ (completeOrder) → postOrderPayment() ลงบัญชี "เงินเข้า" ตามจริง (สด/โอน) + ถ้ามีค้างชำระ ลงเป็นแถว unpaid:true (ลูกหนี้ — โผล่ในการ์ด "ลูกหนี้ค้าง" หน้าแดชบอร์ด + custDebt() ทันที) */
 function orderPaidTotal(o){ return (Number(o.paidCash)||0)+(Number(o.paidTransfer)||0); }
 function orderRemain(o){ return Math.max(0, orderTotal(o)-orderPaidTotal(o)); }
+/* ⭐ ค้างชำระ "ตอนนี้" ของออเดอร์ — ก่อนปิดออเดอร์ยังไม่มีแถวเงิน ใช้ orderRemain() (แผนที่กรอกไว้) ไปก่อน
+   หลังปิดออเดอร์แล้ว ต้องอ่านจากยอดคงเหลือจริงในแถว unpaid (ไม่ใช่ orderRemain เดิม) เพราะรับชำระบางส่วนแล้วยอดจะลดลงเรื่อยๆ โดยไม่แตะ o.paidCash/paidTransfer เลย */
+function orderOutstanding(o){
+ if(!o.stockDeducted) return orderRemain(o);
+ const m=db.money.find(x=>x.refType==='order' && x.refId===o.id && x.unpaid);
+ return m ? (Number(m.amount)||0) : 0;
+}
 function postOrderPayment(o){
  const total=orderTotal(o);
  const cash=Number(o.paidCash)||0;
@@ -1752,7 +1759,7 @@ function renderOrders(){
    + `<button class="lnk" onclick="openDocForm('ใบแจ้งหนี้','','${o.id}')">ออกใบแจ้งหนี้</button>`;
   const profit=orderProfit(o);   // คำนวณสดทุกครั้ง — ไม่เพิ่ม field ใน order
   const pcls=profit>=0?'money-pos':'money-neg';
-  const remain=orderRemain(o);
+  const remain=orderOutstanding(o);
   const payChip = remain>0 ? `<span class="chip c-ใกล้หมด">ค้าง ${baht(remain)}</span>` : `<span class="chip c-เสร็จ">จ่ายครบ</span>`;
   return `<tr>
    <td>${thDate(o.date)}</td>
@@ -1938,7 +1945,7 @@ function openOrderDetail(id){
   nextDocAction=`<button class="btn sm" style="background:var(--ok)" onclick="receivePayment('${latestIv.id}'); openOrderDetail('${id}')">รับชำระ</button>`;
  }
 
- const payPaid=orderPaidTotal(o), payRemain=orderRemain(o);
+ const payPaid=orderPaidTotal(o), payRemain=orderOutstanding(o);
  const unpaidMoneyRow = o.stockDeducted ? db.money.find(m=>m.refType==='order' && m.refId===o.id && m.unpaid) : null;
  const paymentBlock = `<div style="font-size:13.5px;line-height:1.8">
    ${o.paidCash>0?`สด ${baht(o.paidCash)}<br>`:''}
