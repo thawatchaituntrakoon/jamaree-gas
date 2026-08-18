@@ -2169,6 +2169,7 @@ function renderDash(){
    </div></div>`;
  }
  let html=head('แดชบอร์ด','ภาพรวมร้าน '+esc(db.shopName));   // ไม่มีปุ่มเพิ่ม — อ่านอย่างเดียว
+ html+=`<div style="display:flex;justify-content:flex-end;margin:-8px 0 14px"><button class="btn ghost sm" onclick="openDailySummary()">สรุปยอดต่อวัน</button></div>`;
  html+=gasChartCard();   // ⭐ กราฟวงกลมยอดแก๊สคงเหลือ — วางเป็นการ์ดแรกสุดของแดชบอร์ดตามที่ขอ
  const mo=todayStr().slice(0,7);
 
@@ -2267,6 +2268,60 @@ function openArDrill(){
  });
  const rows=invRows.concat(orderRows).join('');
  showDetailPage('ลูกหนี้ค้าง', 'ใบแจ้งหนี้ยังไม่ชำระ + ออเดอร์ที่ยังค้างชำระ', rows?tbl(['เลขที่/ออเดอร์','ลูกค้า','วันที่',['ยอด','num'],['','act']], rows):empty('ไม่มีลูกหนี้ค้าง 🎉'), {wide:true, backFn:"go('dash')"});
+}
+
+/* ⭐ สรุปยอดต่อวัน — นับเฉพาะออเดอร์ที่ปิดแล้ว (stockDeducted) ของวันที่เลือก ไม่รวมออเดอร์ที่ยังไม่ปิด/ยังไม่ตัดสต๊อกจริง
+   ค้างชำระที่โชว์ที่นี่ = ยอดค้างที่ "เกิดจากบิลวันนั้น" ตอนขาย (orderTotal-paidCash-paidTransfer) ไม่ใช่ยอดค้างคงเหลือปัจจุบัน (ที่อาจถูกรับชำระไปแล้วบางส่วนในวันหลัง — ดูยอดค้างล่าสุดจริงได้ที่การ์ด "ลูกหนี้ค้าง" หน้าแดชบอร์ดแทน) */
+function dailySummaryData(dateStr){
+ const orders=db.orders.filter(o=>o.date===dateStr && o.stockDeducted);
+ let sales=0, kg=0, cost=0, cash=0, transfer=0, credit=0, creditBillCount=0;
+ const custCredit={};
+ orders.forEach(o=>{
+  const total=orderTotal(o);
+  sales+=total;
+  o.items.forEach(it=>{
+   const p=db.products.find(x=>x.id===it.productId);
+   if(!p) return;
+   cost += (Number(p.cost)||0)*Number(it.qty||0);
+   if(p.kind==='น้ำแก๊ส'||p.kind==='หมุนเวียน') kg += Number(it.qty)*(Number(p.fillKg)||0);
+  });
+  const paidC=Number(o.paidCash)||0, paidT=Number(o.paidTransfer)||0;
+  cash+=paidC; transfer+=paidT;
+  const remain=Math.max(0, total-paidC-paidT);
+  if(remain>0){
+   credit+=remain; creditBillCount++;
+   const c=db.customers.find(x=>x.id===o.customerId);
+   const name=c?c.name:'ลูกค้าจร';
+   custCredit[name]=(custCredit[name]||0)+remain;
+  }
+ });
+ const custCreditList=Object.entries(custCredit).map(([name,amount])=>({name,amount})).sort((a,b)=>b.amount-a.amount);
+ return {date:dateStr, billCount:orders.length, sales, kg, cost, profit:sales-cost, cash, transfer, credit, creditBillCount, custCreditList};
+}
+function openDailySummary(dateStr){
+ dateStr = dateStr || todayStr();
+ const d=dailySummaryData(dateStr);
+ const custRows=d.custCreditList.map(x=>`<tr><td>${esc(x.name)}</td><td class="num money-neg">${baht(x.amount)}</td></tr>`).join('');
+ const body=`
+  <div class="fld" style="max-width:200px"><label>วันที่</label><input type="date" value="${esc(dateStr)}" onchange="openDailySummary(this.value)"></div>
+  <div class="grid g3" style="margin:18px 0 16px">
+   <div class="card stat"><div class="lab">ยอดขายรวม</div><b class="money-pos">${baht(d.sales)}</b></div>
+   <div class="card stat"><div class="lab">น้ำหนักแก๊สที่ขาย</div><b>${d.kg.toLocaleString('th-TH')} kg</b></div>
+   <div class="card stat"><div class="lab">จำนวนบิล</div><b>${d.billCount}</b></div>
+  </div>
+  <div class="grid g2" style="margin-bottom:22px">
+   <div class="card stat"><div class="lab">ต้นทุนสินค้า</div><b class="money-neg">${baht(d.cost)}</b></div>
+   <div class="card stat"><div class="lab">กำไรขั้นต้น</div><b class="${d.profit>=0?'money-pos':'money-neg'}">${baht(d.profit)}</b></div>
+  </div>
+  <div style="font-size:13.5px;font-weight:700;margin-bottom:8px">ยอดขายแยกตามการชำระ</div>
+  <div class="grid g3" style="margin-bottom:24px">
+   <div class="card stat"><div class="lab">สด</div><b class="money-pos">${baht(d.cash)}</b></div>
+   <div class="card stat"><div class="lab">โอน</div><b class="money-pos">${baht(d.transfer)}</b></div>
+   <div class="card stat"><div class="lab">ค้างชำระ</div><b class="${d.credit>0?'money-neg':''}">${baht(d.credit)}</b></div>
+  </div>
+  <div style="font-size:13.5px;font-weight:700;margin-bottom:8px">ลูกค้าค้างชำระ ${d.creditBillCount} บิล</div>
+  ${custRows?tbl(['ลูกค้า',['ยอดค้าง','num']], custRows):empty('ไม่มีลูกค้าค้างชำระวันนี้ 🎉')}`;
+ showDetailPage('สรุปยอดต่อวัน', thDate(dateStr), body, {wide:true, backFn:"go('dash')"});
 }
 function openDraftDocsDrill(){
  const list=db.docs.filter(d=>d.status==='ร่าง');
