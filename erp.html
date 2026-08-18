@@ -370,6 +370,18 @@ function normalizeDb(){
    if((p.sku==='EQ-REG'||p.sku==='EQ-HOSE') && !p.kind) p.kind='อุปกรณ์แก๊ส';
   });
  })();
+ // ⭐ migration v6: ออเดอร์เดิมใช้ paymentMethod (สด/เชื่อ/โอน) อย่างเดียว → เปลี่ยนเป็น paidCash/paidTransfer (จ่ายผสมได้) + ที่เหลือ = ค้างชำระอัตโนมัติ
+ //   ⚠️ เดิมออเดอร์ไม่เคยลงบัญชี "เงินเข้า" เลยแม้ปิดออเดอร์แล้ว (รายรับ/P&L จึงไม่เห็นยอดขายจากออเดอร์มาตลอด) — backfill ให้ออเดอร์ที่ปิดไปแล้วแต่ยังไม่มีแถวเงิน ด้วยวันที่ของออเดอร์เอง (ไม่ใช่วันนี้) กันรายรับเพี้ยนไปกองที่เดือนปัจจุบัน
+ db.orders.forEach(o=>{
+  if(o.paidCash===undefined || o.paidTransfer===undefined){
+   const total=orderTotal(o);
+   if(o.paymentMethod==='โอน'){ o.paidCash=0; o.paidTransfer=total; }
+   else if(o.paymentMethod==='เชื่อ'){ o.paidCash=0; o.paidTransfer=0; }
+   else { o.paidCash=total; o.paidTransfer=0; }   // 'สด' หรือไม่มีค่าเลย = ค่าเริ่มต้นเดิมของระบบ (จ่ายสดเต็มจำนวน)
+   delete o.paymentMethod;
+  }
+  if(o.stockDeducted && !db.money.some(m=>m.refType==='order' && m.refId===o.id)) postOrderPayment(o);
+ });
  db.pos.forEach(po=>{
   if(!Array.isArray(po.items)) po.items=[];
   if(po.receivedAt===undefined) po.receivedAt=null;
@@ -1399,9 +1411,14 @@ function onImportCustomersFile(ev){
 }
 
 /* ============ หน้ารายละเอียดลูกค้า — ยอดค้างชำระ + ประวัติออเดอร์/เอกสาร (คลิกไล่ต่อได้) ============ */
+/* ⭐ ยอดค้างชำระ = ใบแจ้งหนี้ที่ส่งแล้วยังไม่ได้รับชำระ + ออเดอร์ที่ปิดแล้วแต่ยังมีเงินค้างชำระ (money.unpaid, refType='order') */
 function custDebt(id){
- return db.docs.filter(d=>d.customerId===id && d.type==='ใบแจ้งหนี้' && d.status==='ส่งแล้ว')
+ const invoiceDebt=db.docs.filter(d=>d.customerId===id && d.type==='ใบแจ้งหนี้' && d.status==='ส่งแล้ว')
   .reduce((s,d)=>s+(Number(d.amount)||0), 0);
+ const orderIds=new Set(db.orders.filter(o=>o.customerId===id).map(o=>o.id));
+ const orderDebt=db.money.filter(m=>m.unpaid && m.refType==='order' && orderIds.has(m.refId))
+  .reduce((s,m)=>s+(Number(m.amount)||0), 0);
+ return invoiceDebt+orderDebt;
 }
 
 /* ============ ระบบยืม/คืน/ฝากถังรายลูกค้า (db.custody) ============
@@ -1688,7 +1705,34 @@ function orderProfit(o){
  }, 0);
 }
 
-const PAYMENT_METHODS=['สด','เชื่อ','โอน'];
+/* ⭐ v6 — จ่ายแบบผสมได้ (สด+โอน+ค้างชำระ รวมกันเป็นยอดเต็มออเดอร์): เก็บแค่ paidCash/paidTransfer สองช่อง ที่เหลือ (ยอดรวม-สด-โอน) คือค้างชำระอัตโนมัติ ไม่ต้องกรอกแยก
+   ปิดออเดอร์ (completeOrder) → postOrderPayment() ลงบัญชี "เงินเข้า" ตามจริง (สด/โอน) + ถ้ามีค้างชำระ ลงเป็นแถว unpaid:true (ลูกหนี้ — โผล่ในการ์ด "ลูกหนี้ค้าง" หน้าแดชบอร์ด + custDebt() ทันที) */
+function orderPaidTotal(o){ return (Number(o.paidCash)||0)+(Number(o.paidTransfer)||0); }
+function orderRemain(o){ return Math.max(0, orderTotal(o)-orderPaidTotal(o)); }
+function postOrderPayment(o){
+ const total=orderTotal(o);
+ const cash=Number(o.paidCash)||0;
+ const transfer=Number(o.paidTransfer)||0;
+ const remain=Math.max(0, total-cash-transfer);
+ if(cash>0) addMoneyRow('เข้า', cash, 'ขายออเดอร์ (สด)', {category:'ขาย', refType:'order', refId:o.id, date:o.date});
+ if(transfer>0) addMoneyRow('เข้า', transfer, 'ขายออเดอร์ (โอน)', {category:'ขาย', refType:'order', refId:o.id, date:o.date});
+ if(remain>0) addMoneyRow('เข้า', remain, 'ขายออเดอร์ (ค้างชำระ)', {category:'ขาย', refType:'order', refId:o.id, date:o.date, unpaid:true});
+}
+function recalcOrderPay(){
+ const rows=[...document.querySelectorAll('#o_items .oi-row')];
+ let total=0;
+ rows.forEach(row=>{
+  const pid=row.querySelector('.oi-prod')?.value;
+  const qty=Number(row.querySelector('.oi-qty')?.value||0);
+  const p=pid?db.products.find(x=>x.id===pid):null;
+  if(p) total += (Number(p.price)||0)*qty;
+ });
+ const cash=Number(document.getElementById('o_cash')?.value||0);
+ const transfer=Number(document.getElementById('o_transfer')?.value||0);
+ const remain=Math.max(0, total-cash-transfer);
+ const box=document.getElementById('o_paySummary');
+ if(box) box.innerHTML=`ยอดรวม <b>${baht(total)}</b> · จ่ายแล้ว <b>${baht(cash+transfer)}</b> · ${remain>0?`<span style="color:var(--warn)">ค้างชำระ <b>${baht(remain)}</b></span>`:'<span style="color:var(--ok)">จ่ายครบแล้ว</span>'}`;
+}
 
 function renderOrders(){
  let html=head("ออเดอร์/ขาย","ขายแล้วตัดสต๊อกให้อัตโนมัติ — คลิก 'ดู' เพื่อไปหน้ารายละเอียด","openOrderForm");
@@ -1705,6 +1749,8 @@ function renderOrders(){
    + `<button class="lnk" onclick="openDocForm('ใบแจ้งหนี้','','${o.id}')">ออกใบแจ้งหนี้</button>`;
   const profit=orderProfit(o);   // คำนวณสดทุกครั้ง — ไม่เพิ่ม field ใน order
   const pcls=profit>=0?'money-pos':'money-neg';
+  const remain=orderRemain(o);
+  const payChip = remain>0 ? `<span class="chip c-ใกล้หมด">ค้าง ${baht(remain)}</span>` : `<span class="chip c-เสร็จ">จ่ายครบ</span>`;
   return `<tr>
    <td>${thDate(o.date)}</td>
    <td>${cname}</td>
@@ -1712,7 +1758,7 @@ function renderOrders(){
    <td class="num">${baht(orderTotal(o))}</td>
    <td class="num ${pcls}">${baht(profit)}</td>
    <td><span class="chip c-${o.status}">${esc(o.status)}</span></td>
-   <td><span class="chip c-${esc(o.paymentMethod||'สด')}">${esc(o.paymentMethod||'สด')}</span></td>
+   <td>${payChip}</td>
    <td class="act">${act}</td>
   </tr>`;
  }).join("");
@@ -1728,15 +1774,16 @@ function orderItemRow(pid, qty){
   `<option value="${p.id}" ${p.id===pid?"selected":""}>${esc(p.name)}</option>`
  ).join("");
  return `<div class="frow oi-row" style="align-items:flex-end;margin-bottom:8px">
-   <div class="fld" style="flex:2;margin-bottom:0"><select class="oi-prod"><option value="">— เลือกสินค้า —</option>${opts}</select></div>
-   <div class="fld" style="flex:1;margin-bottom:0"><input class="oi-qty" type="number" min="1" placeholder="จำนวน" value="${qty>0?qty:""}"></div>
-   <button class="lnk del" type="button" onclick="this.closest('.oi-row').remove()" style="padding:10px 8px;font-size:15px">✕</button>
+   <div class="fld" style="flex:2;margin-bottom:0"><select class="oi-prod" onchange="recalcOrderPay()"><option value="">— เลือกสินค้า —</option>${opts}</select></div>
+   <div class="fld" style="flex:1;margin-bottom:0"><input class="oi-qty" type="number" min="1" placeholder="จำนวน" value="${qty>0?qty:""}" oninput="recalcOrderPay()"></div>
+   <button class="lnk del" type="button" onclick="this.closest('.oi-row').remove(); recalcOrderPay()" style="padding:10px 8px;font-size:15px">✕</button>
   </div>`;
 }
 
 function addOrderRow(){
  const box=document.getElementById("o_items");
  if(box) box.insertAdjacentHTML("beforeend", orderItemRow("", 0));
+ recalcOrderPay();
 }
 
 function activeStaffOptions(selectedId){
@@ -1745,10 +1792,6 @@ function activeStaffOptions(selectedId){
   opts.push(`<option value="${s.id}" ${selectedId===s.id?'selected':''}>${esc(s.name)}</option>`);
  });
  return opts.join('');
-}
-
-function paymentMethodOptions(selected){
- return PAYMENT_METHODS.map(m=>`<option value="${m}" ${(selected||'สด')===m?'selected':''}>${m}</option>`).join('');
 }
 
 function openOrderForm(id, prefillCustomerId){
@@ -1761,19 +1804,24 @@ function openOrderForm(id, prefillCustomerId){
   ? o.items.map(it=>orderItemRow(it.productId, it.qty)).join("")
   : orderItemRow("", 0);
  showFormPage(o?"แก้ออเดอร์":"ออเดอร์ใหม่", "", `
-  <div class="frow">
-   <div class="fld"><label>ลูกค้า</label><select id="o_cust">${custOpts}</select></div>
-   <div class="fld"><label>ช่องทางชำระเงิน</label><select id="o_payment">${paymentMethodOptions(o?o.paymentMethod:'')}</select></div>
-  </div>
+  <div class="fld"><label>ลูกค้า</label><select id="o_cust">${custOpts}</select></div>
   <div class="fld"><label>ผู้รับผิดชอบ</label><select id="o_assignee">${activeStaffOptions(o?o.assigneeId:'')}</select></div>
   <div class="fld"><label>รายการสินค้า</label><div id="o_items">${itemsHtml}</div>
-   <button class="btn ghost sm" type="button" onclick="addOrderRow()" style="margin-top:2px">+ เพิ่มรายการ</button></div>`, "saveOrder", id, {wide:true});
+   <button class="btn ghost sm" type="button" onclick="addOrderRow()" style="margin-top:2px">+ เพิ่มรายการ</button></div>
+  <div class="frow" style="margin-top:6px">
+   <div class="fld"><label>จ่ายสด (บาท)</label><input id="o_cash" type="number" min="0" value="${o&&o.paidCash?o.paidCash:''}" placeholder="0" oninput="recalcOrderPay()"></div>
+   <div class="fld"><label>จ่ายโอน (บาท)</label><input id="o_transfer" type="number" min="0" value="${o&&o.paidTransfer?o.paidTransfer:''}" placeholder="0" oninput="recalcOrderPay()"></div>
+  </div>
+  <div id="o_paySummary" style="font-size:13px;color:var(--muted);margin:-6px 0 14px">ยอดรวม/จ่ายแล้ว/ค้างชำระจะคำนวณให้อัตโนมัติ</div>
+  <div style="font-size:12.5px;color:var(--muted);margin-top:-10px">เหลืออะไรไม่ต้องกรอก ระบบนับเป็น "ค้างชำระ" ให้เองจากยอดรวมลบสด/โอน</div>`, "saveOrder", id, {wide:true});
+ recalcOrderPay();
 }
 
 function saveOrder(id){
  const customerId=val("o_cust");
  const assigneeId=val('o_assignee')||null;
- const paymentMethod=val('o_payment')||'สด';
+ const paidCash=Number(val('o_cash'))||0;
+ const paidTransfer=Number(val('o_transfer'))||0;
  const rows=[...document.querySelectorAll("#o_items .oi-row")];
  const items=[];
  rows.forEach(row=>{
@@ -1787,9 +1835,9 @@ function saveOrder(id){
  if(!items.length){ alert("ใส่รายการสินค้าอย่างน้อย 1 รายการ"); return; }
  if(id){
   const o=db.orders.find(x=>x.id===id);
-  if(o){ o.customerId=customerId; o.items=items; o.assigneeId=assigneeId; o.paymentMethod=paymentMethod; }   // ห้ามแตะ stockDeducted/status
+  if(o){ o.customerId=customerId; o.items=items; o.assigneeId=assigneeId; o.paidCash=paidCash; o.paidTransfer=paidTransfer; }   // ห้ามแตะ stockDeducted/status
  }else{
-  db.orders.unshift({id:uid(), customerId, date:todayStr(), status:"ใหม่", items, stockDeducted:false, assigneeId, paymentMethod, workStage:'ใหม่'});
+  db.orders.unshift({id:uid(), customerId, date:todayStr(), status:"ใหม่", items, stockDeducted:false, assigneeId, paidCash, paidTransfer, workStage:'ใหม่'});
  }
  save(); closeModal(); render();
 }
@@ -1822,6 +1870,7 @@ function completeOrder(id){
   addMove(it.productId, "เบิกออก", it.qty, "ขาย/ออเดอร์", {refType:'order', refId:o.id});
  });
  o.stockDeducted=true; o.status="เสร็จ"; o.workStage="ปิด";
+ postOrderPayment(o);   // ⭐ ลงบัญชีเงินเข้าตามที่จ่ายจริง (สด/โอน) + ค้างชำระเป็นลูกหนี้ (unpaid:true) — จุดเดียวที่ทำตอนปิดออเดอร์
  save(); render();
 }
 
@@ -1841,12 +1890,6 @@ function setOrderAssignee(id){
  const o=db.orders.find(x=>x.id===id);
  if(!o) return;
  o.assigneeId=val('od_assignee')||null;
- save(); openOrderDetail(id);
-}
-function setOrderPayment(id){
- const o=db.orders.find(x=>x.id===id);
- if(!o) return;
- o.paymentMethod=val('od_payment')||'สด';
  save(); openOrderDetail(id);
 }
 function staffName(id){ const s=db.staff.find(x=>x.id===id); return s?s.name:''; }
@@ -1892,13 +1935,22 @@ function openOrderDetail(id){
   nextDocAction=`<button class="btn sm" style="background:var(--ok)" onclick="receivePayment('${latestIv.id}'); openOrderDetail('${id}')">รับชำระ</button>`;
  }
 
+ const payPaid=orderPaidTotal(o), payRemain=orderRemain(o);
+ const unpaidMoneyRow = o.stockDeducted ? db.money.find(m=>m.refType==='order' && m.refId===o.id && m.unpaid) : null;
+ const paymentBlock = `<div style="font-size:13.5px;line-height:1.8">
+   ${o.paidCash>0?`สด ${baht(o.paidCash)}<br>`:''}
+   ${o.paidTransfer>0?`โอน ${baht(o.paidTransfer)}<br>`:''}
+   ${payRemain>0?`<span style="color:var(--warn);font-weight:600">ค้างชำระ ${baht(payRemain)}</span>`:(payPaid>0?'<span style="color:var(--ok)">จ่ายครบแล้ว</span>':'')}
+   ${unpaidMoneyRow?`<div style="margin-top:6px"><button class="lnk" style="color:var(--ok);padding:0" onclick="markBillPaid('${unpaidMoneyRow.id}'); openOrderDetail('${id}')">รับชำระค้าง</button></div>`:''}
+  </div>`;
+
  showDetailPage(`ออเดอร์ ${thDate(o.date)}`, c?esc(c.name):'—', `
   <div style="display:flex;align-items:flex-start;margin-bottom:22px">${timeline}</div>
   <div style="text-align:center;margin-bottom:20px">${nextBtn}</div>
   <div class="grid g3" style="margin-bottom:16px">
    <div class="fld" style="margin-bottom:0"><label>ลูกค้า</label><div>${c?`<button class="lnk" style="padding:0;color:var(--ink);font-weight:600" onclick="openCustomerDetail('${c.id}')">${esc(c.name)}</button>`:'—'}</div></div>
    <div class="fld" style="margin-bottom:0"><label>ผู้รับผิดชอบ</label><select id="od_assignee" onchange="setOrderAssignee('${id}')">${activeStaffOptions(o.assigneeId)}</select></div>
-   <div class="fld" style="margin-bottom:0"><label>ช่องทางชำระเงิน</label><select id="od_payment" onchange="setOrderPayment('${id}')">${paymentMethodOptions(o.paymentMethod)}</select></div>
+   <div class="fld" style="margin-bottom:0"><label>การชำระเงิน</label>${paymentBlock}</div>
   </div>
   <div style="font-size:13.5px;font-weight:700;margin-bottom:8px">รายการสินค้า</div>
   ${tbl(['สินค้า',['จำนวน','num'],['ราคา/หน่วย','num'],['รวม','num']], itemRows)}
@@ -1936,10 +1988,10 @@ function renderMoney(){
    <td>${thDate(m.date)}</td>
    <td>${esc(m.type)}</td>
    <td class="num ${pos?'money-pos':'money-neg'}">${pos?'+':'−'}${baht(m.amount)}</td>
-   <td>${m.category?esc(m.category):'—'}${m.unpaid?' <span class="chip c-ใกล้หมด">ค้างจ่าย</span>':''}</td>
+   <td>${m.category?esc(m.category):'—'}${m.unpaid?` <span class="chip c-ใกล้หมด">${pos?'ค้างรับ':'ค้างจ่าย'}</span>`:''}</td>
    <td>${m.note?esc(m.note):'—'}</td>
    <td class="act">
-    ${m.unpaid?`<button class="lnk" onclick="markBillPaid('${m.id}')">จ่ายแล้ว</button>`:''}
+    ${m.unpaid?`<button class="lnk" onclick="markBillPaid('${m.id}')">${pos?'รับแล้ว':'จ่ายแล้ว'}</button>`:''}
     ${(m.type==='ออก' && m.whtAmt) ? `<button class="lnk" onclick="printWht50('${m.id}')">พิมพ์ 50 ทวิ</button>` : ''}
     ${(!m.refType||m.refType==='po')?`<button class="lnk" onclick="openMoneyForm('${m.id}')">แก้</button>`:''}
     ${m.refType?'':`<button class="lnk del" onclick="delRow('money','${m.id}')">ลบ</button>`}
@@ -2090,7 +2142,8 @@ function renderDash(){
  </div>`;
 
  // การ์ดฝั่งธุรกิจ/บัญชี — คำนวณสดจาก docs/staff/leaves เช่นกัน ไม่เก็บซ้ำ
- const arTotal=db.docs.filter(d=>d.type==='ใบแจ้งหนี้' && d.status==='ส่งแล้ว').reduce((s,d)=>s+(Number(d.amount)||0),0);
+ const arTotal=db.docs.filter(d=>d.type==='ใบแจ้งหนี้' && d.status==='ส่งแล้ว').reduce((s,d)=>s+(Number(d.amount)||0),0)
+  + db.money.filter(m=>m.unpaid && m.refType==='order').reduce((s,m)=>s+(Number(m.amount)||0),0);
  const draftDocs=db.docs.filter(d=>d.status==='ร่าง').length;
  const onLeaveToday=db.staff.filter(s=>db.leaves.some(l=>l.staffId===s.id && l.dateFrom<=todayStr() && l.dateTo>=todayStr())).length;
  const poPending=(db.pos||[]).filter(po=>po.status==='สั่งแล้ว').length;
@@ -2121,8 +2174,7 @@ function renderDash(){
 
 /* ============ หน้า drill จากแดชบอร์ด — ลิสต์จริงที่กรองแล้ว พร้อมปุ่มจัดการต่อ ============ */
 function openArDrill(){
- const list=db.docs.filter(d=>d.type==='ใบแจ้งหนี้' && d.status==='ส่งแล้ว');
- const rows=list.map(d=>{
+ const invRows=db.docs.filter(d=>d.type==='ใบแจ้งหนี้' && d.status==='ส่งแล้ว').map(d=>{
   const c=db.customers.find(x=>x.id===d.customerId);
   return `<tr>
    <td><button class="lnk" style="padding:0;font-weight:600;color:var(--ink)" onclick="openDocDetail('${d.id}')">${esc(d.number)}</button></td>
@@ -2131,8 +2183,20 @@ function openArDrill(){
    <td class="num">${baht(d.amount)}</td>
    <td class="act"><button class="lnk" style="color:var(--ok)" onclick="receivePayment('${d.id}'); openArDrill()">รับชำระ</button></td>
   </tr>`;
- }).join('');
- showDetailPage('ลูกหนี้ค้าง', 'ใบแจ้งหนี้ที่ยังไม่ได้รับชำระ', rows?tbl(['เลขที่','ลูกค้า','วันที่',['ยอด','num'],['','act']], rows):empty('ไม่มีลูกหนี้ค้าง 🎉'), {wide:true, backFn:"go('dash')"});
+ });
+ const orderRows=db.money.filter(m=>m.unpaid && m.refType==='order').map(m=>{
+  const o=db.orders.find(x=>x.id===m.refId);
+  const c=o?db.customers.find(x=>x.id===o.customerId):null;
+  return `<tr>
+   <td>${o?`<button class="lnk" style="padding:0;font-weight:600;color:var(--ink)" onclick="openOrderDetail('${o.id}')">ออเดอร์ ${thDate(o.date)}</button>`:'—'}</td>
+   <td>${c?`<button class="lnk" style="padding:0;color:var(--ink)" onclick="openCustomerDetail('${c.id}')">${esc(c.name)}</button>`:'ลูกค้าจร'}</td>
+   <td>${thDate(m.date)}</td>
+   <td class="num">${baht(m.amount)}</td>
+   <td class="act"><button class="lnk" style="color:var(--ok)" onclick="markBillPaid('${m.id}'); openArDrill()">รับชำระ</button></td>
+  </tr>`;
+ });
+ const rows=invRows.concat(orderRows).join('');
+ showDetailPage('ลูกหนี้ค้าง', 'ใบแจ้งหนี้ยังไม่ชำระ + ออเดอร์ที่ยังค้างชำระ', rows?tbl(['เลขที่/ออเดอร์','ลูกค้า','วันที่',['ยอด','num'],['','act']], rows):empty('ไม่มีลูกหนี้ค้าง 🎉'), {wide:true, backFn:"go('dash')"});
 }
 function openDraftDocsDrill(){
  const list=db.docs.filter(d=>d.status==='ร่าง');
