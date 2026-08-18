@@ -238,6 +238,137 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 input[type=number]{-moz-appearance:textfield}
 .mfoot{display:flex;gap:9px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid rgba(26,32,50,.08)}
 </style>
+<style id="posStyles">
+#posRoot{display:none}
+body.pos-active .app-shell{display:none}
+body.pos-active #posRoot{display:flex;flex-direction:column;height:100vh;background:var(--paper)}
+body.pos-active{overscroll-behavior:none}
+
+.pos-top{display:flex;align-items:center;gap:18px;padding:14px 24px;background:var(--card);border-bottom:1px solid var(--line);flex:none}
+.pos-brand{display:flex;align-items:center;gap:12px;flex:none}
+.pos-brand-mark{width:42px;height:42px;border-radius:12px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Bai Jamjuree";font-weight:700;font-size:17px}
+.pos-brand-name{font-family:"Bai Jamjuree";font-weight:700;font-size:17px}
+.pos-brand-sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+.pos-top-tabs{display:flex;gap:8px;flex:1;justify-content:center}
+.pos-top-tab{padding:13px 26px;border-radius:99px;border:1.5px solid var(--line);background:var(--paper);color:var(--muted);font-weight:700;font-size:15px;min-height:52px}
+.pos-top-tab.active{background:var(--ink);border-color:var(--ink);color:#fff}
+.pos-exit-link{font-size:12px;color:var(--faint);text-decoration:none;flex:none;padding:8px}
+
+.pos-main{flex:1;min-height:0;overflow:hidden;display:flex}
+.pos-main>*{flex:1;min-height:0}
+
+.pos-body{display:flex;height:100%}
+.pos-catalog{flex:1;display:flex;flex-direction:column;min-width:0;padding:20px 20px 20px}
+.pos-cat-tabs{display:flex;gap:10px;overflow-x:auto;padding-bottom:16px;flex:none}
+.pos-cat-tab{flex:none;padding:14px 24px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);color:var(--muted);font-weight:700;font-size:15px;display:flex;align-items:center;gap:9px;min-height:52px}
+.pos-cat-tab .n{font-size:12px;font-weight:700;background:var(--paper);color:var(--faint);border-radius:99px;padding:2px 8px}
+.pos-cat-tab.active{background:var(--ink);border-color:var(--ink);color:#fff}
+.pos-cat-tab.active .n{background:rgba(255,255,255,.18);color:#fff}
+.pos-product-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;align-content:start;padding-bottom:16px}
+.pos-prod-card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh);padding:20px 18px;text-align:left;min-height:128px;display:flex;flex-direction:column;justify-content:space-between;gap:16px}
+.pos-prod-card:active{transform:scale(.96)}
+.pos-prod-name{font-family:"Bai Jamjuree";font-weight:700;font-size:17px;line-height:1.3}
+.pos-prod-meta{display:flex;align-items:baseline;justify-content:space-between}
+.pos-prod-price{font-family:"Bai Jamjuree";font-weight:700;font-size:21px;color:var(--accent)}
+.pos-prod-unit{font-size:12.5px;color:var(--faint)}
+.pos-empty{color:var(--faint);text-align:center;padding:40px 20px;font-size:14px;line-height:1.8}
+
+.pos-cart{width:400px;flex:none;background:var(--card);border-left:1px solid var(--line);display:flex;flex-direction:column;height:100%}
+.pos-cart-customer{padding:18px 20px;border-bottom:1px solid var(--line);flex:none}
+.pos-cust-label{font-size:12px;font-weight:700;color:var(--faint);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
+.pos-cust-picker{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--paper);border:1.5px solid var(--line);border-radius:13px;padding:15px 16px;font-size:15.5px;font-weight:700;color:var(--ink);min-height:56px}
+.pos-cust-picker .chev{color:var(--faint);font-size:13px;font-weight:600}
+.pos-cart-list{flex:1;overflow-y:auto;padding:6px 20px}
+.pos-cart-item{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--line)}
+.pos-cart-item:last-child{border-bottom:none}
+.pos-ci-info{flex:1;min-width:0}
+.pos-ci-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pos-ci-price{font-size:12.5px;color:var(--muted);margin-top:2px}
+.pos-ci-qty{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:99px;flex:none}
+.pos-ci-qty button{width:38px;height:38px;border:none;background:none;color:var(--ink);font-size:19px;font-weight:700}
+.pos-ci-qty button:first-child{color:var(--danger)}
+.pos-ci-qty .q{width:28px;text-align:center;font-weight:700;font-size:15px}
+.pos-ci-total{width:72px;text-align:right;font-weight:700;font-size:15px;flex:none}
+.pos-cart-summary{padding:14px 20px 6px;flex:none}
+.pos-cart-summary .row{display:flex;justify-content:space-between;align-items:baseline;font-size:14.5px;color:var(--muted)}
+.pos-cart-summary .row b{color:var(--ink);font-family:"Bai Jamjuree";font-size:18px}
+.pos-pay-section{padding:14px 20px;border-top:1px solid var(--line);flex:none}
+.pos-pay-label{font-size:12px;font-weight:700;color:var(--faint);letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px}
+.pos-pay-quick{display:flex;gap:8px;margin-bottom:10px}
+.pos-pay-quick-btn{flex:1;padding:13px 6px;border-radius:11px;border:1.5px solid var(--accent);background:#eaf1fe;color:var(--accent);font-weight:700;font-size:13.5px;min-height:48px}
+.pos-pay-inputs{display:flex;gap:10px;margin-bottom:10px}
+.pos-pay-input{flex:1;display:flex;flex-direction:column;gap:5px;align-items:flex-start;border:1.5px solid var(--line);border-radius:11px;padding:10px 13px;background:var(--card);min-height:58px}
+.pos-pay-input span{font-size:11.5px;font-weight:700;color:var(--muted)}
+.pos-pay-input b{font-family:"Bai Jamjuree";font-size:17px;color:var(--ink)}
+.pos-pay-remain{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;background:#fdf1e3;border-radius:11px;font-size:14px;color:var(--warn);font-weight:700}
+.pos-pay-remain.zero{background:#e8f7ee;color:var(--ok)}
+.pos-pay-remain b{font-family:"Bai Jamjuree";font-size:16px}
+.pos-checkout-btn{margin:14px 20px 20px;padding:19px;border:none;border-radius:13px;background:var(--accent);color:#fff;font-family:"Bai Jamjuree";font-weight:700;font-size:17.5px;min-height:62px;box-shadow:0 6px 16px rgba(37,99,235,.28)}
+.pos-checkout-btn:disabled{background:var(--line);color:var(--faint);box-shadow:none}
+
+.pos-overlay{position:fixed;inset:0;background:rgba(15,18,32,.42);display:none;align-items:center;justify-content:center;z-index:80;padding:20px}
+.pos-overlay.on{display:flex}
+.pos-sheet{width:100%;max-width:460px;max-height:80vh;background:var(--card);border-radius:20px;box-shadow:0 20px 50px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+.pos-sheet-head{padding:20px 22px 14px;border-bottom:1px solid var(--line);flex:none}
+.pos-sheet-head h3{font-size:19px}
+.pos-sheet-head input{width:100%;margin-top:12px;border:1.5px solid var(--line);border-radius:11px;padding:14px 15px;font-size:15.5px;background:var(--paper)}
+.pos-sheet-list{overflow-y:auto;padding:8px}
+.pos-sheet-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 14px;border-radius:11px;min-height:56px}
+.pos-sheet-row:active{background:var(--paper)}
+.pos-sheet-row .nm{font-weight:700;font-size:15.5px}
+.pos-sheet-row .ph{font-size:12.5px;color:var(--muted);margin-top:2px}
+.pos-tier-badge{font-size:12px;font-weight:700;color:var(--accent2);background:#e3f5f3;border-radius:99px;padding:3px 10px}
+
+.pos-numpad-display{padding:20px 22px;text-align:right;font-family:"Bai Jamjuree";font-size:34px;font-weight:700;border-bottom:1px solid var(--line)}
+.pos-numpad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line)}
+.pos-num-key{background:var(--card);border:none;padding:22px;font-size:22px;font-weight:700;min-height:64px}
+.pos-num-key.del{color:var(--danger)}
+.pos-num-key.ok{background:var(--accent);color:#fff}
+
+.pos-receipt{padding:38px 28px 28px;text-align:center}
+.pos-receipt-mark{width:64px;height:64px;border-radius:50%;background:#e8f7ee;color:var(--ok);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:30px;font-weight:700}
+.pos-receipt h3{font-size:20px;margin-bottom:6px}
+.pos-receipt p{color:var(--muted);font-size:14px;margin-bottom:22px}
+.pos-receipt-amt{font-family:"Bai Jamjuree";font-size:34px;font-weight:700;margin-bottom:24px}
+
+.pos-tank-wrap{max-width:640px;margin:0 auto;padding:28px 20px;overflow-y:auto;height:100%}
+.pos-section-title{font-size:14px;font-weight:700;color:var(--muted);margin-bottom:10px}
+.pos-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);padding:16px 18px}
+.pos-bal-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+.pos-bal-row:last-child{border-bottom:none}
+.pos-tank-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pos-tank-action{padding:20px 14px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);font-weight:700;font-size:15.5px;min-height:64px;box-shadow:var(--sh)}
+.pos-tank-action:active{background:var(--paper)}
+.pos-tank-action.wide{grid-column:1/-1}
+.pos-field-label{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:10px}
+.pos-size-grid{display:flex;flex-wrap:wrap;gap:10px}
+.pos-size-btn{padding:13px 20px;border-radius:11px;border:1.5px solid var(--line);background:var(--card);font-weight:700;font-size:15px;min-height:48px}
+.pos-size-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.pos-qty-stepper{display:flex;align-items:center;gap:20px;justify-content:center;padding:14px 0}
+.pos-qty-stepper button{width:52px;height:52px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);font-size:24px;font-weight:700}
+.pos-qty-stepper span{font-family:"Bai Jamjuree";font-size:26px;font-weight:700;min-width:40px;text-align:center}
+.pos-sheet-btns{display:flex;gap:10px;margin-top:22px}
+.pos-btn-ghost{flex:1;padding:15px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);font-weight:700;font-size:15px;min-height:52px}
+.pos-btn-primary{flex:1;padding:15px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-weight:700;font-size:15px;min-height:52px}
+
+.pos-bills-wrap{max-width:760px;margin:0 auto;padding:24px 20px;overflow-y:auto;height:100%}
+.pos-bill-row{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--sh)}
+.pos-bill-row.voided{opacity:.55}
+.pos-bill-info{flex:1;min-width:0}
+.pos-bill-cust{font-weight:700;font-size:15px}
+.pos-bill-items{font-size:12.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pos-bill-total{font-family:"Bai Jamjuree";font-weight:700;font-size:16px;flex:none}
+.pos-chip{font-size:12px;font-weight:700;border-radius:99px;padding:5px 12px;flex:none}
+.pos-chip.ok{background:#e8f7ee;color:var(--ok)}
+.pos-chip.warn{background:#fdf1e3;color:var(--warn)}
+.pos-chip.voided{background:var(--paper);color:var(--faint)}
+.pos-void-btn{flex:none;padding:11px 16px;border-radius:10px;border:1.5px solid var(--danger);color:var(--danger);background:#fff;font-weight:700;font-size:13px;min-height:44px}
+
+@media (max-width:900px){
+ .pos-cart{width:340px}
+ .pos-product-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}
+</style>
 </head>
 <body>
 
@@ -262,6 +393,7 @@ input[type=number]{-moz-appearance:textfield}
    <button onclick="importData()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21V9"/><path d="M7 13l5-5 5 5"/><path d="M4 3h16"/></svg>นำเข้าข้อมูล</button>
    <input id="importFile" type="file" accept=".json" style="display:none" onchange="onImportFile(event)">
    <button onclick="openGoLiveConfirm()" style="color:var(--accent);font-weight:700"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2c.9-.9.9-2.2 0-3-.8-.9-2.1-.9-3 0"/><path d="M9 13l-2-2a11 11 0 0 1 9-8 11 11 0 0 1-8 9z"/><path d="M14 8a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0"/></svg>เริ่มใช้จริง</button>
+   <a href="?pos=1" style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted);border-radius:9px;padding:8px 11px;text-decoration:none" onmouseover="this.style.background='rgba(22,25,45,.05)';this.style.color='var(--accent)'" onmouseout="this.style.background='transparent';this.style.color='var(--muted)'"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>โหมดขายหน้าร้าน (แท็บเล็ต)</a>
   </div>
  </aside>
  <div class="main-col">
@@ -273,6 +405,7 @@ input[type=number]{-moz-appearance:textfield}
  </div>
 </div>
 <div class="ov" id="ov"><div class="modal" id="modal"></div></div>
+<div id="posRoot"></div>
 
 <script>
 /* ============ ข้อมูลกลาง (SSOT) — ก้อนเดียว ============ */
@@ -432,7 +565,11 @@ function tbl(cols,rows){ const th=cols.map(c=>Array.isArray(c)?`<th class="${c[1
 function openModal(html){ document.getElementById("modal").innerHTML=html; document.getElementById("ov").classList.add("on"); }
 /* ⭐ closeModal() คือ "กลับ" ของทั้งระบบตอนนี้ — ไม่มี modal overlay อีกแล้ว แค่ re-render แท็บปัจจุบันทับฟอร์มใน #view
    จุดนี้จงใจให้ save* ทุกฟังก์ชันเรียก closeModal() เหมือนเดิมทุกตัวอักษร (ไม่แตะ business logic) แต่ได้พฤติกรรมใหม่ฟรี */
-function closeModal(){ document.getElementById("ov").classList.remove("on"); render(); }
+function closeModal(){
+ const ov=document.getElementById("ov");
+ if(ov) ov.classList.remove("on");
+ if(isPosMode()) renderPosApp(); else render();
+}
 function mfoot(fn,id){ return `<div class="mfoot"><button class="btn ghost" onclick="closeModal()">ยกเลิก</button><button class="btn" onclick="savePress(this,'${fn}','${id||""}')">บันทึก</button></div>`; }
 /* ============ กลไกกลาง: หน้ากรอกข้อมูลแบบ full page (แทน modal) — sidebar ค้างซ้าย เมนู active คงแท็บเดิม ============
    title/subtitle = หัวเรื่อง · bodyHtml = เนื้อฟอร์ม (.fld/.frow เดิม) · saveFn/id = ปุ่มบันทึกเรียก savePress เหมือน modal เดิม
@@ -614,7 +751,10 @@ function paintShop(){
 }
 
 function init(){
- load(); paintShop();
+ load();
+ // ⭐ โหมด "ขายหน้าร้าน" (?pos=1) แยกจอทั้งหมด ไม่แตะ/ไม่วาดโครงหลังบ้านเลย (sidebar/tabs/render เดิม) ข้อมูล db เดียวกัน
+ if(isPosMode()){ initPos(); return; }
+ paintShop();
  document.getElementById("shopName").onclick=editShop;
  window.__ready=true;
  if(MODULES.length && !cur) cur=MODULES[0].key;
@@ -1518,7 +1658,7 @@ function saveBorrowCylinder(customerId){
  addMove(raw.id, 'เบิกออก', kgNeed, 'ยืมถัง (ค้างคืนถังเปล่า) '+size, {refType:'custody', refId});
  addMoneyRow('เข้า', qty*(Number(full.price)||0), 'ยืมถัง '+size+' x'+qty, {category:'ขาย', refType:'custody', refId});
  db.custody.push({id:refId, date:todayStr(), customerId, size, type:'ยืม', qty, note:val('cu_note')||''});
- save(); closeModal(); openCustomerDetail(customerId);
+ save(); closeModal(); if(!isPosMode()) openCustomerDetail(customerId);
 }
 
 function openReturnCylinder(customerId){
@@ -1539,7 +1679,7 @@ function saveReturnCylinder(customerId){
  const refId=uid();
  if(empty) addMove(empty.id, 'รับเข้า', qty, 'รับถังเปล่าคืน (ยืม)', {refType:'custody', refId});
  db.custody.push({id:refId, date:todayStr(), customerId, size, type:'คืน', qty, note:''});
- save(); closeModal(); openCustomerDetail(customerId);
+ save(); closeModal(); if(!isPosMode()) openCustomerDetail(customerId);
 }
 
 function openDepositCylinder(customerId){
@@ -1554,7 +1694,7 @@ function saveDepositCylinder(customerId){
  const size=val('cu_size'), qty=Number(val('cu_qty'));
  if(!size || !(qty>0)){ alert('เลือกขนาดและจำนวนให้ถูกต้อง'); return; }
  db.custody.push({id:uid(), date:todayStr(), customerId, size, type:'ฝาก', qty, note:val('cu_note')||''});
- save(); closeModal(); openCustomerDetail(customerId);
+ save(); closeModal(); if(!isPosMode()) openCustomerDetail(customerId);
 }
 
 function openWithdrawDeposit(customerId){
@@ -1572,7 +1712,7 @@ function saveWithdrawDeposit(customerId){
  const bal=custodyBalance(customerId,size).deposited;
  if(qty>bal){ alert('ลูกค้าฝากไว้แค่ '+bal+' ถัง ถอนเกินไม่ได้'); return; }
  db.custody.push({id:uid(), date:todayStr(), customerId, size, type:'ถอนฝาก', qty, note:''});
- save(); closeModal(); openCustomerDetail(customerId);
+ save(); closeModal(); if(!isPosMode()) openCustomerDetail(customerId);
 }
 
 function openDamagedExchange(customerId){
@@ -1595,7 +1735,7 @@ function saveDamagedExchange(customerId){
  const damaged=db.products.find(p=>p.kind==='ชำรุด' && p.size===size);
  if(damaged) addMove(damaged.id, 'รับเข้า', qty, 'รับถังชำรุดจากลูกค้า (รอส่งคืนบริษัท)', {refType:'custody', refId});
  db.custody.push({id:refId, date:todayStr(), customerId, size, type:'เปลี่ยนถังชำรุด', qty, note:'รับถังชำรุดคืน (ไม่เข้าสต๊อกเปล่า — กองรอส่งคืนบริษัท)'});
- save(); closeModal(); openCustomerDetail(customerId);
+ save(); closeModal(); if(!isPosMode()) openCustomerDetail(customerId);
 }
 
 function openCustomerDetail(id){
@@ -2228,7 +2368,7 @@ function renderDash(){
 
  // การ์ดใหม่: งานค้างรายคน — group ออเดอร์ที่ยังไม่ปิด ตาม assignee (คำนวณสด ไม่เก็บ)
  const workloadMap={};
- db.orders.filter(o=>o.status!=='เสร็จ').forEach(o=>{
+ db.orders.filter(o=>o.status!=='เสร็จ' && !o.voided).forEach(o=>{
   const key=o.assigneeId||'__none__';
   workloadMap[key]=(workloadMap[key]||0)+1;
  });
@@ -2274,7 +2414,7 @@ function openArDrill(){
 /* ⭐ สรุปยอดต่อวัน — นับเฉพาะออเดอร์ที่ปิดแล้ว (stockDeducted) ของวันที่เลือก ไม่รวมออเดอร์ที่ยังไม่ปิด/ยังไม่ตัดสต๊อกจริง
    ค้างชำระที่โชว์ที่นี่ = ยอดค้างที่ "เกิดจากบิลวันนั้น" ตอนขาย (orderTotal-paidCash-paidTransfer) ไม่ใช่ยอดค้างคงเหลือปัจจุบัน (ที่อาจถูกรับชำระไปแล้วบางส่วนในวันหลัง — ดูยอดค้างล่าสุดจริงได้ที่การ์ด "ลูกหนี้ค้าง" หน้าแดชบอร์ดแทน) */
 function dailySummaryData(dateStr){
- const orders=db.orders.filter(o=>o.date===dateStr && o.stockDeducted);
+ const orders=db.orders.filter(o=>o.date===dateStr && o.stockDeducted && !o.voided);
  let sales=0, kg=0, cost=0, cash=0, transfer=0, credit=0, creditBillCount=0;
  const custCredit={};
  orders.forEach(o=>{
@@ -2310,7 +2450,7 @@ function tankSummaryData(dateStr){
 }
 /* ⭐ เวอร์ชันช่วง (สำหรับรายสัปดาห์/รายเดือน) — ตรรกะเดียวกับ dailySummaryData แต่ไม่มีรายชื่อลูกค้าค้างชำระรายตัว (ใช้แค่รวมยอดทำกราฟ) */
 function periodSalesData(startDate, endDate){
- const orders=db.orders.filter(o=>o.stockDeducted && o.date>=startDate && o.date<=endDate);
+ const orders=db.orders.filter(o=>o.stockDeducted && !o.voided && o.date>=startDate && o.date<=endDate);
  let sales=0, kg=0, cost=0, cash=0, transfer=0, credit=0;
  orders.forEach(o=>{
   const total=orderTotal(o);
@@ -2500,7 +2640,7 @@ function openLeaveTodayDrill(){
  showDetailPage('พนักงานลาวันนี้', thDate(today), rows.length?tbl(['ชื่อ','ประเภทลา','ช่วงวันที่'], rows.join('')):empty('ไม่มีใครลาวันนี้'), {wide:true, backFn:"go('dash')"});
 }
 function openPendingOrdersDrill(assigneeFilter){
- let list=db.orders.filter(o=>o.status!=='เสร็จ');
+ let list=db.orders.filter(o=>o.status!=='เสร็จ' && !o.voided);
  if(assigneeFilter==='unassigned') list=list.filter(o=>!o.assigneeId);
  else if(assigneeFilter) list=list.filter(o=>o.assigneeId===assigneeFilter);
  const rows=list.map(o=>{
@@ -3596,7 +3736,7 @@ function renderStaffOverviewTab(s){
  const history=db.payrolls.filter(p=>p.rows.some(r=>r.staffId===s.id))
   .slice().sort((a,b)=>b.period.localeCompare(a.period))
   .map(p=>{ const r=p.rows.find(x=>x.staffId===s.id); return `<tr><td>${esc(p.period)}</td><td class="num">${baht(r.net)}</td><td><span class="chip c-${esc(p.status)}">${esc(p.status)}</span></td></tr>`; }).join('');
- const heldOrders=db.orders.filter(o=>o.assigneeId===s.id && o.status!=='เสร็จ');
+ const heldOrders=db.orders.filter(o=>o.assigneeId===s.id && o.status!=='เสร็จ' && !o.voided);
  const heldRows=heldOrders.length ? heldOrders.map(o=>{
   const c=db.customers.find(x=>x.id===o.customerId);
   return `<div class="li"><div class="main"><button class="lnk" style="padding:0;font-weight:600;color:var(--ink)" onclick="openOrderDetail('${o.id}')">ออเดอร์ ${thDate(o.date)}</button><div class="m">${c?esc(c.name):'—'} · ${baht(orderTotal(o))}</div></div><span class="chip c-${esc(o.workStage||'ใหม่')}" style="background:#eff4ff;color:#2563eb">${esc(o.workStage||'ใหม่')}</span></div>`;
@@ -4692,6 +4832,366 @@ function saveTask(id){
  save(); closeModal();
 }
 registerModule({key:'board', ic:'board', label:'บอร์ดงาน', render:renderBoard});
+
+/* ============================================================================
+   โหมด "ขายหน้าร้าน" (POS) — จอแยกทั้งหมดสำหรับพนักงานหน้าเคาน์เตอร์ ไม่เห็นเมนูหลังบ้านเลย
+   เข้าทาง erp.html?pos=1 (เจ้าของเปิดครั้งแรกแล้วปักหน้าจอ/บุ๊กมาร์กไว้ในแท็บเล็ตให้พนักงาน)
+   ⭐ เป็นโค้ดเสริมล้วนๆ ไม่แก้ฟังก์ชันหลังบ้านที่มีอยู่ (นอกจาก guard เล็กๆ 2 จุดที่ไม่กระทบพฤติกรรมเดิมเลย)
+   ข้อมูลชุดเดียวกับหลังบ้านเป๊ะ (db ก้อนเดียวกัน) เรียก orderTotal/completeOrder/productPriceFor/custody
+   functions ตัวเดียวกับหลังบ้านทุกจุด — ไม่มีลอจิกซ้อน กันตัวเลขสองระบบไม่ตรงกัน
+   "แก้บิล" ทำแบบแก้ในบิลเดิมไม่ได้ (สต๊อก/เงินตัดจริงไปแล้ว) ให้ "ยกเลิกบิล" (คืนสต๊อก+ลบยอดเงินของบิลนั้น)
+   แล้วขายใหม่แทน ปลอดภัยกว่า ตัวเลขบัญชีไม่มั่ว ============================================================ */
+function isPosMode(){ return new URLSearchParams(location.search).get('pos')==='1'; }
+
+let posTab='sell';
+let posCart=[];               // [{id,name,unit,price,qty}] — price = ราคาตามชุดลูกค้า ณ ตอนหยิบใส่ตะกร้า
+let posCustomerId='';         // '' = ลูกค้าจร
+let posActiveCat=null;
+let posPayCash=0, posPayTransfer=0;
+let posPickerTarget='cart';
+let posTankCustomerId='';
+let posCustodyAction=null, posCustodySize=null, posCustodyQty=1;
+let posNumpadField=null, posNumpadValue='';
+
+function posSellableProducts(){
+ return db.products.filter(p=>p.kind!=='เปล่า' && p.kind!=='ชำรุด' && p.kind!=='ต่างยี่ห้อ' && p.kind!=='ดิบ' && p.active!==false);
+}
+function posCategories(){
+ const all=posSellableProducts();
+ const cats=[
+  {key:'gas', label:'น้ำแก๊ส', items:all.filter(p=>p.kind==='น้ำแก๊ส'||p.kind==='หมุนเวียน')},
+  {key:'tank', label:'ถังใหม่', items:all.filter(p=>p.kind==='ใหม่')},
+  {key:'other', label:'อุปกรณ์ / บริการ', items:all.filter(p=>!['น้ำแก๊ส','หมุนเวียน','ใหม่'].includes(p.kind))},
+ ];
+ return cats.filter(c=>c.items.length);
+}
+
+function posCartTotal(){ return posCart.reduce((s,x)=>s+x.price*x.qty,0); }
+function posAddToCart(productId){
+ const p=db.products.find(x=>x.id===productId); if(!p) return;
+ const price=productPriceFor(p, posCustomerId||null);
+ const row=posCart.find(x=>x.id===productId);
+ if(row) row.qty+=1; else posCart.push({id:p.id, name:p.name, unit:p.unit, price, qty:1});
+ renderPosApp();
+}
+function posChangeQty(productId, d){
+ const row=posCart.find(x=>x.id===productId); if(!row) return;
+ row.qty+=d;
+ if(row.qty<=0) posCart=posCart.filter(x=>x.id!==productId);
+ renderPosApp();
+}
+function posCustomerLabel(){
+ if(!posCustomerId) return 'ลูกค้าจร';
+ const c=db.customers.find(x=>x.id===posCustomerId);
+ if(!c) return 'ลูกค้าจร';
+ const tier=c.priceTierId ? db.priceTiers.find(t=>t.id===c.priceTierId) : null;
+ return c.name + (tier?' · '+tier.name:'');
+}
+function posRemain(){ return Math.max(0, posCartTotal()-posPayCash-posPayTransfer); }
+function posPayCashFull(){ posPayCash=posCartTotal(); posPayTransfer=0; renderPosApp(); }
+function posPayTransferFull(){ posPayTransfer=posCartTotal(); posPayCash=0; renderPosApp(); }
+
+/* ---------- ปุ่มตัวเลขใหญ่ (คนแก่กดง่ายกว่าคีย์บอร์ดจิ๋วของแท็บเล็ต) ---------- */
+function posOpenNumpad(field){
+ posNumpadField=field;
+ posNumpadValue=String(field==='cash'?(posPayCash||''):(posPayTransfer||''));
+ const root=document.getElementById('posOverlayRoot');
+ root.innerHTML=posNumpadHtml();
+ root.classList.add('on');
+}
+function posNumpadHtml(){
+ const label = posNumpadField==='cash' ? 'จำนวนเงินสด (บาท)' : 'จำนวนเงินโอน (บาท)';
+ return `<div class="pos-sheet" style="max-width:340px">
+  <div class="pos-sheet-head"><h3>${esc(label)}</h3></div>
+  <div class="pos-numpad-display">${posNumpadValue?Number(posNumpadValue).toLocaleString('th-TH'):'0'}</div>
+  <div class="pos-numpad-grid">
+   ${['1','2','3','4','5','6','7','8','9','ลบ','0','เสร็จ'].map(k=>`<button class="pos-num-key ${k==='เสร็จ'?'ok':''} ${k==='ลบ'?'del':''}" data-k="${k}">${k==='ลบ'?'⌫':k}</button>`).join('')}
+  </div>
+ </div>`;
+}
+function posNumpadTap(k){
+ if(k==='ลบ') posNumpadValue=posNumpadValue.slice(0,-1);
+ else if(k==='เสร็จ'){
+  const v=Number(posNumpadValue)||0;
+  if(posNumpadField==='cash') posPayCash=v; else posPayTransfer=v;
+  closePosSheet(); renderPosApp(); return;
+ } else {
+  if(posNumpadValue.length<7) posNumpadValue+=k;
+ }
+ document.getElementById('posOverlayRoot').innerHTML=posNumpadHtml();
+}
+function closePosSheet(){ const el=document.getElementById('posOverlayRoot'); if(el){ el.classList.remove('on'); el.innerHTML=''; } }
+
+/* ---------- เช็คเอาต์ — เรียก completeOrder() ตัวเดียวกับหลังบ้านตรงๆ ============ */
+function posCheckout(){
+ if(!posCart.length) return;
+ const items=posCart.map(c=>({productId:c.id, qty:c.qty}));
+ const o={id:uid(), customerId:posCustomerId||'', date:todayStr(), status:'ใหม่', items, stockDeducted:false, assigneeId:null, paidCash:posPayCash, paidTransfer:posPayTransfer, workStage:'ใหม่'};
+ db.orders.unshift(o); save();
+ completeOrder(o.id);
+ const after=db.orders.find(x=>x.id===o.id);
+ if(!after.stockDeducted) return; // completeOrder เองมี alert("ของไม่พอ"/"แก๊สดิบไม่พอ") ให้แล้ว — บิลค้างเป็น "ใหม่" ไม่ตัดสต๊อก ไปลบทิ้งจากหลังบ้านได้
+ posShowReceipt(after);
+}
+function posShowReceipt(o){
+ const total=orderTotal(o);
+ const remain=Math.max(0,total-(Number(o.paidCash)||0)-(Number(o.paidTransfer)||0));
+ const payLine = remain>0 ? `ค้างชำระ ${baht(remain)}` : 'จ่ายครบแล้ว';
+ const root=document.getElementById('posOverlayRoot');
+ root.innerHTML=`<div class="pos-sheet" style="max-width:360px"><div class="pos-receipt">
+   <div class="pos-receipt-mark">✓</div>
+   <h3>บันทึกการขายแล้ว</h3>
+   <p>${esc(posCustomerLabel())} · ${esc(payLine)}</p>
+   <div class="pos-receipt-amt">${baht(total)}</div>
+   <button class="pos-checkout-btn" style="margin:0" onclick="posResetCart()">เริ่มบิลใหม่</button>
+  </div></div>`;
+ root.classList.add('on');
+}
+function posResetCart(){
+ posCart=[]; posCustomerId=''; posPayCash=0; posPayTransfer=0;
+ closePosSheet();
+ renderPosApp();
+}
+
+/* ---------- เลือกลูกค้า (ใช้ร่วมกันทั้งแท็บขายกับแท็บบัญชีถัง ผ่าน posPickerTarget) ---------- */
+function posOpenCustomerPicker(target){
+ posPickerTarget=target||'cart';
+ const root=document.getElementById('posOverlayRoot');
+ root.innerHTML=posCustomerPickerHtml('');
+ root.classList.add('on');
+ setTimeout(()=>{ const el=document.getElementById('posCustSearch'); if(el) el.focus(); },50);
+}
+function posCustomerPickerHtml(q){
+ q=(q||'').trim().toLowerCase();
+ const list=db.customers.filter(c=>!q || c.name.toLowerCase().includes(q) || (c.phone||'').includes(q)).slice(0,40);
+ const rows = `<div class="pos-sheet-row" onclick="posSetCustomer('')"><div><div class="nm">ลูกค้าจร</div></div></div>` +
+  list.map(c=>{
+   const tier=c.priceTierId?db.priceTiers.find(t=>t.id===c.priceTierId):null;
+   return `<div class="pos-sheet-row" onclick="posSetCustomer('${c.id}')">
+    <div><div class="nm">${esc(c.name)}</div>${c.phone?`<div class="ph">${esc(c.phone)}</div>`:''}</div>
+    ${tier?`<span class="pos-tier-badge">${esc(tier.name)}</span>`:''}
+   </div>`;
+  }).join('');
+ return `<div class="pos-sheet" style="max-width:440px;max-height:76vh">
+  <div class="pos-sheet-head">
+   <h3>เลือกลูกค้า</h3>
+   <input id="posCustSearch" placeholder="ค้นหาชื่อ / เบอร์โทร" oninput="posFilterCustomer(this.value)" value="${esc(q)}">
+  </div>
+  <div class="pos-sheet-list">${rows}</div>
+ </div>`;
+}
+function posFilterCustomer(q){
+ const box=document.getElementById('posOverlayRoot');
+ const focused=document.activeElement && document.activeElement.id==='posCustSearch';
+ box.innerHTML=posCustomerPickerHtml(q);
+ if(focused){ const el=document.getElementById('posCustSearch'); el.focus(); el.setSelectionRange(el.value.length,el.value.length); }
+}
+function posSetCustomer(id){
+ if(posPickerTarget==='tank'){ posTankCustomerId=id||''; closePosSheet(); renderPosApp(); return; }
+ posCustomerId=id||'';
+ posCart.forEach(row=>{
+  const p=db.products.find(x=>x.id===row.id);
+  if(p) row.price=productPriceFor(p, posCustomerId||null);
+ });
+ closePosSheet();
+ renderPosApp();
+}
+
+/* ---------- แท็บ "ขายสินค้า" ---------- */
+function renderPosSell(){
+ const cats=posCategories();
+ if(!posActiveCat || !cats.find(c=>c.key===posActiveCat)) posActiveCat=cats.length?cats[0].key:null;
+ const activeItems=posActiveCat ? cats.find(c=>c.key===posActiveCat).items : [];
+ const tabsHtml=cats.map(c=>`<button class="pos-cat-tab ${c.key===posActiveCat?'active':''}" onclick="posActiveCat='${c.key}'; renderPosApp()">${esc(c.label)}<span class="n">${c.items.length}</span></button>`).join('');
+ const gridHtml=activeItems.length ? activeItems.map(p=>`
+  <button class="pos-prod-card" onclick="posAddToCart('${p.id}')">
+   <div class="pos-prod-name">${esc(p.name)}</div>
+   <div class="pos-prod-meta"><span class="pos-prod-price">${baht(productPriceFor(p,posCustomerId||null))}</span><span class="pos-prod-unit">/${esc(p.unit)}</span></div>
+  </button>`).join('') : `<div class="pos-empty">ยังไม่มีสินค้าในหมวดนี้</div>`;
+
+ const cartHtml = posCart.length ? posCart.map(x=>`
+  <div class="pos-cart-item">
+   <div class="pos-ci-info"><div class="pos-ci-name">${esc(x.name)}</div><div class="pos-ci-price">${baht(x.price)} / ${esc(x.unit)}</div></div>
+   <div class="pos-ci-qty">
+    <button onclick="posChangeQty('${x.id}',-1)">−</button><span class="q">${x.qty}</span><button onclick="posChangeQty('${x.id}',1)">+</button>
+   </div>
+   <div class="pos-ci-total">${baht(x.price*x.qty)}</div>
+  </div>`).join('') : `<div class="pos-empty">แตะสินค้าทางซ้าย<br>เพื่อเริ่มบิลใหม่</div>`;
+
+ const total=posCartTotal();
+ const remain=posRemain();
+ const remainCls = remain>0 ? '' : 'zero';
+ const remainLabel = remain>0 ? 'ค้างชำระ' : (total>0?'จ่ายครบแล้ว':'ยังไม่มีรายการ');
+
+ return `<div class="pos-body">
+  <section class="pos-catalog">
+   <div class="pos-cat-tabs">${tabsHtml}</div>
+   <div class="pos-product-grid">${gridHtml}</div>
+  </section>
+  <aside class="pos-cart">
+   <div class="pos-cart-customer">
+    <div class="pos-cust-label">ลูกค้า</div>
+    <button class="pos-cust-picker" onclick="posOpenCustomerPicker('cart')"><span>${esc(posCustomerLabel())}</span><span class="chev">เปลี่ยน ›</span></button>
+   </div>
+   <div class="pos-cart-list">${cartHtml}</div>
+   <div class="pos-cart-summary"><div class="row"><span>ยอดรวม</span><b>${baht(total)}</b></div></div>
+   <div class="pos-pay-section">
+    <div class="pos-pay-label">การชำระเงิน</div>
+    <div class="pos-pay-quick">
+     <button class="pos-pay-quick-btn" onclick="posPayCashFull()">จ่ายสดครบ</button>
+     <button class="pos-pay-quick-btn" onclick="posPayTransferFull()">จ่ายโอนครบ</button>
+    </div>
+    <div class="pos-pay-inputs">
+     <button class="pos-pay-input" onclick="posOpenNumpad('cash')"><span>สด</span><b>${baht(posPayCash)}</b></button>
+     <button class="pos-pay-input" onclick="posOpenNumpad('transfer')"><span>โอน</span><b>${baht(posPayTransfer)}</b></button>
+    </div>
+    <div class="pos-pay-remain ${remainCls}"><span>${remainLabel}</span><b>${baht(remain)}</b></div>
+   </div>
+   <button class="pos-checkout-btn" ${total<=0?'disabled':''} onclick="posCheckout()">ยืนยันการขาย · ${baht(total)}</button>
+  </aside>
+ </div>`;
+}
+
+/* ---------- แท็บ "บัญชีถัง" — ห่อ UI ปุ่มใหญ่ แต่เรียก save function เดิมของหลังบ้านตรงๆ ไม่มีลอจิกซ้อน ---------- */
+const POS_CUSTODY_TITLES={borrow:'ยืมถัง',return:'คืนถัง',deposit:'ฝากถัง',withdraw:'ถอนถังฝาก',damaged:'เปลี่ยนถังชำรุด'};
+function posCustodySizeOptions(action){
+ if(action==='borrow'||action==='deposit') return [...new Set(db.products.filter(p=>p.kind==='น้ำแก๊ส'&&p.size).map(p=>p.size))];
+ if(action==='return') return custodySizes(posTankCustomerId).filter(x=>x.borrowed>0).map(x=>x.size);
+ if(action==='withdraw') return custodySizes(posTankCustomerId).filter(x=>x.deposited>0).map(x=>x.size);
+ return [...new Set(db.products.filter(p=>p.kind==='ใหม่'&&p.size).map(p=>p.size))]; // damaged → เปลี่ยนเป็นถังใหม่
+}
+function renderPosTank(){
+ const cust = posTankCustomerId ? db.customers.find(c=>c.id===posTankCustomerId) : null;
+ const custRow = `<button class="pos-cust-picker" style="max-width:520px;margin:0 auto 22px" onclick="posOpenCustomerPicker('tank')"><span>${cust?esc(cust.name):'— แตะเพื่อเลือกลูกค้า —'}</span><span class="chev">เปลี่ยน ›</span></button>`;
+ if(!cust) return `<div class="pos-tank-wrap"><div class="pos-section-title">เลือกลูกค้าก่อน</div>${custRow}</div>`;
+ const sizes=custodySizes(cust.id).filter(x=>x.borrowed>0||x.deposited>0);
+ const balRows = sizes.length ? sizes.map(x=>`<div class="pos-bal-row"><span>${esc(x.size)}</span><span>${x.borrowed>0?'ค้างคืน '+x.borrowed+' ถัง':''} ${x.deposited>0?'ฝากไว้ '+x.deposited+' ถัง':''}</span></div>`).join('') : `<div class="pos-empty" style="padding:14px 0">ไม่มีถังค้างคืน/ฝากไว้</div>`;
+ return `<div class="pos-tank-wrap">
+  ${custRow}
+  <div class="pos-section-title">ถังค้างของ ${esc(cust.name)}</div>
+  <div class="pos-card" style="margin-bottom:24px">${balRows}</div>
+  <div class="pos-section-title">ทำรายการ</div>
+  <div class="pos-tank-actions">
+   <button class="pos-tank-action" onclick="posOpenCustodyForm('borrow')">ยืมถัง</button>
+   <button class="pos-tank-action" onclick="posOpenCustodyForm('return')">คืนถัง</button>
+   <button class="pos-tank-action" onclick="posOpenCustodyForm('deposit')">ฝากถัง</button>
+   <button class="pos-tank-action" onclick="posOpenCustodyForm('withdraw')">ถอนถังฝาก</button>
+   <button class="pos-tank-action wide" onclick="posOpenCustodyForm('damaged')">เปลี่ยนถังชำรุด</button>
+  </div>
+ </div>`;
+}
+function posOpenCustodyForm(action){
+ posCustodyAction=action; posCustodyQty=1;
+ const sizeOptions=posCustodySizeOptions(action);
+ if(!sizeOptions.length){ alert('ไม่มีรายการให้เลือกสำหรับลูกค้ารายนี้'); return; }
+ posCustodySize=sizeOptions[0];
+ renderPosCustodySheet();
+}
+function renderPosCustodySheet(){
+ const sizeOptions=posCustodySizeOptions(posCustodyAction);
+ const sizeBtns=sizeOptions.map(s=>`<button class="pos-size-btn ${s===posCustodySize?'active':''}" onclick="posCustodySize='${s}'; renderPosCustodySheet()">${esc(s)}</button>`).join('');
+ const root=document.getElementById('posOverlayRoot');
+ root.innerHTML=`<div class="pos-sheet" style="max-width:380px">
+   <div class="pos-sheet-head"><h3>${esc(POS_CUSTODY_TITLES[posCustodyAction])}</h3></div>
+   <div style="padding:18px 20px">
+    <div class="pos-field-label">ขนาดถัง</div>
+    <div class="pos-size-grid">${sizeBtns}</div>
+    <div class="pos-field-label" style="margin-top:18px">จำนวน (ถัง)</div>
+    <div class="pos-qty-stepper">
+     <button onclick="posCustodyQty=Math.max(1,posCustodyQty-1); renderPosCustodySheet()">−</button>
+     <span>${posCustodyQty}</span>
+     <button onclick="posCustodyQty+=1; renderPosCustodySheet()">+</button>
+    </div>
+    <div class="pos-sheet-btns">
+     <button class="pos-btn-ghost" onclick="closePosSheet()">ยกเลิก</button>
+     <button class="pos-btn-primary" onclick="posConfirmCustody()">ยืนยัน</button>
+    </div>
+   </div>
+  </div>`;
+ root.classList.add('on');
+}
+function posConfirmCustody(){
+ // เติมค่าลงช่อง input จริงที่ save function เดิมของหลังบ้านอ่านอยู่ (cu_size/cu_qty/cu_note) แล้วเรียกฟังก์ชันเดิมตรงๆ — ไม่มีลอจิกซ้อน ไม่แก้ของเดิมสักบรรทัด
+ let hidden=document.getElementById('posHiddenFields');
+ if(!hidden){ hidden=document.createElement('div'); hidden.id='posHiddenFields'; hidden.style.display='none'; document.body.appendChild(hidden); }
+ hidden.innerHTML=`<input id="cu_size" value="${esc(posCustodySize)}"><input id="cu_qty" value="${posCustodyQty}"><input id="cu_note" value="">`;
+ const fnMap={borrow:'saveBorrowCylinder', return:'saveReturnCylinder', deposit:'saveDepositCylinder', withdraw:'saveWithdrawDeposit', damaged:'saveDamagedExchange'};
+ window[fnMap[posCustodyAction]](posTankCustomerId);
+}
+
+/* ---------- แท็บ "บิลวันนี้" — ยกเลิกบิลผิดได้ (คืนสต๊อก+ลบเงินของบิลนั้น) ---------- */
+function posTodayOrders(){ return db.orders.filter(o=>o.date===todayStr() && o.stockDeducted); }
+function renderPosBills(){
+ const orders=posTodayOrders();
+ if(!orders.length) return `<div class="pos-bills-wrap"><div class="pos-empty" style="padding:60px 20px">ยังไม่มีบิลวันนี้</div></div>`;
+ const rows=orders.map(o=>{
+  const c=o.customerId?db.customers.find(x=>x.id===o.customerId):null;
+  const itemsSummary=o.items.map(it=>{ const p=db.products.find(x=>x.id===it.productId); return p?`${p.name} x${it.qty}`:''; }).filter(Boolean).join(', ');
+  const total=orderTotal(o);
+  const remain=orderOutstanding(o);
+  const statusChip = o.voided ? `<span class="pos-chip voided">ยกเลิกแล้ว</span>` : (remain>0?`<span class="pos-chip warn">ค้าง ${baht(remain)}</span>`:`<span class="pos-chip ok">จ่ายครบ</span>`);
+  return `<div class="pos-bill-row ${o.voided?'voided':''}">
+   <div class="pos-bill-info">
+    <div class="pos-bill-cust">${esc(c?c.name:'ลูกค้าจร')}</div>
+    <div class="pos-bill-items">${esc(itemsSummary)}</div>
+   </div>
+   <div class="pos-bill-total">${baht(total)}</div>
+   ${statusChip}
+   ${o.voided?'':`<button class="pos-void-btn" onclick="posVoidOrder('${o.id}')">ยกเลิกบิล</button>`}
+  </div>`;
+ }).join('');
+ return `<div class="pos-bills-wrap">${rows}</div>`;
+}
+function posVoidOrder(orderId){
+ const o=db.orders.find(x=>x.id===orderId);
+ if(!o || o.voided) return;
+ if(!confirm('ยกเลิกบิลนี้ใช่ไหม? ระบบจะคืนสต๊อกและลบยอดเงินของบิลนี้ทั้งหมด')) return;
+ o.items.forEach(it=>{
+  const p=db.products.find(x=>x.id===it.productId);
+  if(!p || p.kind==='บริการ') return;
+  if(p.kind==='น้ำแก๊ส'||p.kind==='หมุนเวียน'){
+   const raw=db.products.find(x=>x.kind==='ดิบ');
+   const kg=Number(it.qty)*(Number(p.fillKg)||0);
+   if(raw) addMove(raw.id,'รับเข้า', kg, 'ยกเลิกบิล (คืนสต๊อก)', {refType:'order', refId:orderId});
+   return;
+  }
+  addMove(p.id,'รับเข้า', it.qty, 'ยกเลิกบิล (คืนสต๊อก)', {refType:'order', refId:orderId});
+ });
+ db.money = db.money.filter(m=>!(m.refType==='order' && m.refId===orderId));
+ o.voided=true; o.status='ยกเลิก';
+ save();
+ renderPosApp();
+}
+
+/* ---------- โครงหน้าหลัก + จุดเข้า ---------- */
+function renderPosApp(){
+ const root=document.getElementById('posRoot');
+ if(!root) return;
+ const clock=new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+ let body;
+ if(posTab==='sell') body=renderPosSell();
+ else if(posTab==='tank') body=renderPosTank();
+ else body=renderPosBills();
+ root.innerHTML=`
+  <header class="pos-top">
+   <div class="pos-brand"><div class="pos-brand-mark">${esc((db.shopName||'ร').trim().charAt(0))}</div><div><div class="pos-brand-name">${esc(db.shopName||'JAMAREE GAS')}</div><div class="pos-brand-sub">หน้าขาย · ${esc(clock)}</div></div></div>
+   <div class="pos-top-tabs">
+    <button class="pos-top-tab ${posTab==='sell'?'active':''}" onclick="posTab='sell'; renderPosApp()">ขายสินค้า</button>
+    <button class="pos-top-tab ${posTab==='tank'?'active':''}" onclick="posTab='tank'; renderPosApp()">บัญชีถัง</button>
+    <button class="pos-top-tab ${posTab==='bills'?'active':''}" onclick="posTab='bills'; renderPosApp()">บิลวันนี้</button>
+   </div>
+   <a class="pos-exit-link" href="${esc(location.pathname)}">ออกจากโหมดนี้</a>
+  </header>
+  <main class="pos-main">${body}</main>
+  <div class="pos-overlay" id="posOverlayRoot"></div>`;
+ const ov=document.getElementById('posOverlayRoot');
+ ov.addEventListener('click', e=>{ if(e.target===ov) closePosSheet(); });
+ ov.addEventListener('click', e=>{ const keyBtn=e.target.closest('.pos-num-key'); if(keyBtn) posNumpadTap(keyBtn.dataset.k); });
+}
+function initPos(){
+ document.body.classList.add('pos-active');
+ renderPosApp();
+}
 
 /* ============ ก้อนที่ 17: ทะเบียนตำแหน่ง & JD ============
    ตำแหน่ง = "หน้าที่ขององค์กร" (มีอยู่แม้ยังไม่มีคนถือ) ต่างจาก staff.role ที่เป็นแค่ข้อความบนนามบัตร
