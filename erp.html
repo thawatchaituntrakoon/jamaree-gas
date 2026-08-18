@@ -510,7 +510,8 @@ const ICONS={
  clock:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v5l3 2',
  hammer:'M14 3l7 7-3 3-7-7zM11 6 3 14v7h7l8-8',
  truck:'M1 3h15v13H1zM16 8h4l3 3v5h-7V8zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
- tank:'M9 2h6M10 2v2.6c0 .9-.5 1.7-1.3 2.2C7.2 7.8 6 9.7 6 12v7a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-7c0-2.3-1.2-4.2-2.7-5.2A2.6 2.6 0 0 1 14 4.6V2'
+ tank:'M9 2h6M10 2v2.6c0 .9-.5 1.7-1.3 2.2C7.2 7.8 6 9.7 6 12v7a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-7c0-2.3-1.2-4.2-2.7-5.2A2.6 2.6 0 0 1 14 4.6V2',
+ bars:'M4 20V10M10 20V4M16 20V13M22 20V7'
 };
 function icon(name,size){
  const d=ICONS[name]; if(!d) return '';
@@ -524,7 +525,7 @@ function registerModule(m){ MODULES.push(m); if(window.__ready){ tabs(); if(!cur
 let cur="";
 // จัดหมวดเมนู sidebar — แค่จัดกลุ่มการแสดงผล ไม่กระทบ MODULES/registerModule เดิม
 const NAV_GROUPS=[
- {label:"หน้าหลัก", keys:["dash"]},
+ {label:"หน้าหลัก", keys:["dash","reports"]},
  {label:"งาน", keys:["board"]},
  {label:"ขาย", keys:["customers","orders","docs"]},
  {label:"คลังสินค้า", keys:["products","tanks","purchases"]},
@@ -539,8 +540,8 @@ const NAV_GROUPS=[
    ห้ามถอดข้อความเตือนในตัวสลับบทบาทออก คนใช้ต้องรู้ว่าอันนี้ไม่ใช่ของจริง */
 const ROLE_LABEL={owner:"เจ้าของ", manager:"หัวหน้า", staff:"พนักงาน"};
 const ROLE_TABS={
- owner:  ["dash","board","customers","orders","docs","products","tanks","purchases","money","staff","attendance","payroll"],
- manager:["dash","board","customers","orders","docs","products","tanks","purchases","staff","attendance"],
+ owner:  ["dash","reports","board","customers","orders","docs","products","tanks","purchases","money","staff","attendance","payroll"],
+ manager:["dash","reports","board","customers","orders","docs","products","tanks","purchases","staff","attendance"],
  staff:  ["board","attendance"]
 };
 function actingStaff(){ return db.actingAs ? db.staff.find(s=>s.id===db.actingAs) : null; }
@@ -2169,7 +2170,7 @@ function renderDash(){
    </div></div>`;
  }
  let html=head('แดชบอร์ด','ภาพรวมร้าน '+esc(db.shopName));   // ไม่มีปุ่มเพิ่ม — อ่านอย่างเดียว
- html+=`<div style="display:flex;justify-content:flex-end;margin:-8px 0 14px"><button class="btn ghost sm" onclick="openDailySummary()">สรุปยอดต่อวัน</button></div>`;
+ html+=`<div style="display:flex;justify-content:flex-end;margin:-8px 0 14px"><button class="btn ghost sm" onclick="go('reports')">สรุปยอด</button></div>`;
  html+=gasChartCard();   // ⭐ กราฟวงกลมยอดแก๊สคงเหลือ — วางเป็นการ์ดแรกสุดของแดชบอร์ดตามที่ขอ
  const mo=todayStr().slice(0,7);
 
@@ -2307,14 +2308,88 @@ function tankSummaryData(dateStr){
  const income=db.money.filter(m=>m.type==='เข้า' && m.refType==='custody' && m.date===dateStr).reduce((s,m)=>s+(Number(m.amount)||0),0);
  return {date:dateStr, totalEntries:entries.length, counts, income};
 }
-function openDailySummary(dateStr){
- dateStr = dateStr || todayStr();
+/* ⭐ เวอร์ชันช่วง (สำหรับรายสัปดาห์/รายเดือน) — ตรรกะเดียวกับ dailySummaryData แต่ไม่มีรายชื่อลูกค้าค้างชำระรายตัว (ใช้แค่รวมยอดทำกราฟ) */
+function periodSalesData(startDate, endDate){
+ const orders=db.orders.filter(o=>o.stockDeducted && o.date>=startDate && o.date<=endDate);
+ let sales=0, kg=0, cost=0, cash=0, transfer=0, credit=0;
+ orders.forEach(o=>{
+  const total=orderTotal(o);
+  sales+=total;
+  o.items.forEach(it=>{
+   const p=db.products.find(x=>x.id===it.productId);
+   if(!p) return;
+   cost += (Number(p.cost)||0)*Number(it.qty||0);
+   if(p.kind==='น้ำแก๊ส'||p.kind==='หมุนเวียน') kg += Number(it.qty)*(Number(p.fillKg)||0);
+  });
+  const paidC=Number(o.paidCash)||0, paidT=Number(o.paidTransfer)||0;
+  cash+=paidC; transfer+=paidT;
+  credit+=Math.max(0, total-paidC-paidT);
+ });
+ return {billCount:orders.length, sales, kg, cost, profit:sales-cost, cash, transfer, credit};
+}
+function tankIncomeInRange(startDate, endDate){
+ return db.money.filter(m=>m.type==='เข้า' && m.refType==='custody' && m.date>=startDate && m.date<=endDate).reduce((s,m)=>s+(Number(m.amount)||0),0);
+}
+function thDateShort(s){ if(!s) return ''; const[,m,d]=s.split('-'); return d+'/'+m; }
+function weekRange(anchorDate){
+ // จันทร์-อาทิตย์ของสัปดาห์ที่มี anchorDate อยู่
+ const d=new Date(anchorDate+'T00:00:00');
+ const day=d.getDay();
+ const diffToMon=(day===0?-6:1-day);
+ const mon=new Date(d); mon.setDate(d.getDate()+diffToMon);
+ const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+ return {start:mon.toISOString().slice(0,10), end:sun.toISOString().slice(0,10)};
+}
+function monthRange(ym){
+ const [y,m]=ym.split('-').map(Number);
+ const lastDay=new Date(y,m,0).getDate();
+ return {start:ym+'-01', end:ym+'-'+String(lastDay).padStart(2,'0')};
+}
+const THAI_MONTHS_SHORT=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+/* ⭐ กราฟแท่ง SVG มือเขียนล้วน (ไม่ใช้ไลบรารีตามกฎบ้าน) — bars=[{label,value}] */
+function barChartSvg(bars, opts){
+ opts=opts||{};
+ const W=opts.width||680, H=opts.height||200, padBottom=34, padTop=24, padSide=8, gap=10;
+ const max=Math.max(1, ...bars.map(b=>b.value));
+ const n=bars.length||1;
+ const barW=Math.max(6,(W-padSide*2-gap*(n-1))/n);
+ const color=opts.color||'var(--accent)';
+ const barsSvg=bars.map((b,i)=>{
+  const h=Math.max(2,(b.value/max)*(H-padTop-padBottom));
+  const x=padSide+i*(barW+gap);
+  const y=H-padBottom-h;
+  const valLabel=b.value>=1000?(Math.round(b.value/100)/10)+'k':Math.round(b.value);
+  return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="4" fill="${color}"/>
+   <text x="${x+barW/2}" y="${y-6}" font-size="10.5" text-anchor="middle" fill="var(--ink)" font-weight="700">${valLabel}</text>
+   <text x="${x+barW/2}" y="${H-padBottom+16}" font-size="10.5" text-anchor="middle" fill="var(--muted)">${esc(b.label)}</text>`;
+ }).join('');
+ return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px">${barsSvg}</svg>`;
+}
+
+/* ============ แท็บ "สรุปยอด" — รายวัน/รายสัปดาห์/รายเดือน + กราฟแท่งเปรียบเทียบ ============ */
+let reportsTab='day', reportDay=todayStr();
+function setReportsTab(t){ reportsTab=t; render(); }
+function setReportDay(d){ reportDay=d||todayStr(); render(); }
+function renderReports(){
+ let html=`<div class="pagehead"><div><h2>สรุปยอด</h2><div class="sub">ยอดขาย/บัญชีถัง — รายวัน เปรียบเทียบรายสัปดาห์และรายเดือน</div></div></div>`;
+ html+=`<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+  <button class="btn ${reportsTab==='day'?'':'ghost'} sm" onclick="setReportsTab('day')">รายวัน</button>
+  <button class="btn ${reportsTab==='week'?'':'ghost'} sm" onclick="setReportsTab('week')">รายสัปดาห์</button>
+  <button class="btn ${reportsTab==='month'?'':'ghost'} sm" onclick="setReportsTab('month')">รายเดือน</button>
+ </div>`;
+ if(reportsTab==='week') html+=renderWeekReport();
+ else if(reportsTab==='month') html+=renderMonthReport();
+ else html+=renderDayReport();
+ return html;
+}
+function renderDayReport(){
+ const dateStr=reportDay;
  const d=dailySummaryData(dateStr);
  const t=tankSummaryData(dateStr);
  const custRows=d.custCreditList.map(x=>`<tr><td>${esc(x.name)}</td><td class="num money-neg">${baht(x.amount)}</td></tr>`).join('');
  const tankCountRow=Object.entries(t.counts).map(([type,n])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span style="color:var(--muted)">${esc(type)}</span><b>${n} ครั้ง</b></div>`).join('');
- const body=`
-  <div class="fld" style="max-width:200px"><label>วันที่</label><input type="date" value="${esc(dateStr)}" onchange="openDailySummary(this.value)"></div>
+ return `
+  <div class="fld" style="max-width:200px"><label>วันที่</label><input type="date" value="${esc(dateStr)}" onchange="setReportDay(this.value)"></div>
   <div class="grid g3" style="margin:18px 0 16px">
    <div class="card stat"><div class="lab">ยอดขายรวม</div><b class="money-pos">${baht(d.sales)}</b></div>
    <div class="card stat"><div class="lab">น้ำหนักแก๊สที่ขาย</div><b>${d.kg.toLocaleString('th-TH')} kg</b></div>
@@ -2340,8 +2415,63 @@ function openDailySummary(dateStr){
    <div class="card stat"><div class="lab">ธุรกรรมถังทั้งหมด</div><b>${t.totalEntries} รายการ</b></div>
   </div>
   <div class="card" style="padding:14px 16px">${t.totalEntries?tankCountRow:'<div class="empty">ไม่มีธุรกรรมถังวันนี้</div>'}</div>`;
- showDetailPage('สรุปยอดต่อวัน', thDate(dateStr), body, {wide:true, backFn:"go('dash')"});
 }
+function renderWeekReport(){
+ const weeksBack=8;
+ const curWeek=weekRange(todayStr());
+ const bars=[];
+ for(let i=weeksBack-1;i>=0;i--){
+  const anchor=new Date(curWeek.start+'T00:00:00'); anchor.setDate(anchor.getDate()-7*i);
+  const wk=weekRange(anchor.toISOString().slice(0,10));
+  const data=periodSalesData(wk.start, wk.end);
+  bars.push({label:thDateShort(wk.start), value:data.sales, wk, data});
+ }
+ const thisWeek=bars[bars.length-1];
+ const tankIncome=tankIncomeInRange(thisWeek.wk.start, thisWeek.wk.end);
+ return `
+  <div style="font-size:13px;color:var(--muted);margin-bottom:14px">สัปดาห์นี้: ${thDate(thisWeek.wk.start)} – ${thDate(thisWeek.wk.end)}</div>
+  <div class="grid g4" style="margin-bottom:20px">
+   <div class="card stat"><div class="lab">ยอดขายสัปดาห์นี้</div><b class="money-pos">${baht(thisWeek.data.sales)}</b></div>
+   <div class="card stat"><div class="lab">น้ำหนักแก๊ส</div><b>${thisWeek.data.kg.toLocaleString('th-TH')} kg</b></div>
+   <div class="card stat"><div class="lab">จำนวนบิล</div><b>${thisWeek.data.billCount}</b></div>
+   <div class="card stat"><div class="lab">กำไรขั้นต้น</div><b class="${thisWeek.data.profit>=0?'money-pos':'money-neg'}">${baht(thisWeek.data.profit)}</b></div>
+  </div>
+  <div class="card stat" style="margin-bottom:20px"><div class="lab">เงินเข้าจากบัญชีถังสัปดาห์นี้</div><b class="money-pos">${baht(tankIncome)}</b></div>
+  <div class="card" style="padding:20px 16px">
+   <div style="font-size:13.5px;font-weight:700;margin-bottom:6px">เปรียบเทียบยอดขายรายสัปดาห์ (${weeksBack} สัปดาห์ล่าสุด)</div>
+   <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">ป้ายกำกับ = วันจันทร์ต้นสัปดาห์นั้น</div>
+   ${barChartSvg(bars.map(b=>({label:b.label, value:b.value})))}
+  </div>`;
+}
+function renderMonthReport(){
+ const monthsBack=6;
+ const now=new Date();
+ const bars=[];
+ for(let i=monthsBack-1;i>=0;i--){
+  const d=new Date(now.getFullYear(), now.getMonth()-i, 1);
+  const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  const mr=monthRange(ym);
+  const data=periodSalesData(mr.start, mr.end);
+  const label=THAI_MONTHS_SHORT[d.getMonth()]+' '+String((d.getFullYear()+543)%100).padStart(2,'0');
+  bars.push({label, value:data.sales, mr, data});
+ }
+ const thisMonth=bars[bars.length-1];
+ const tankIncome=tankIncomeInRange(thisMonth.mr.start, thisMonth.mr.end);
+ return `
+  <div style="font-size:13px;color:var(--muted);margin-bottom:14px">เดือนนี้: ${thisMonth.label}</div>
+  <div class="grid g4" style="margin-bottom:20px">
+   <div class="card stat"><div class="lab">ยอดขายเดือนนี้</div><b class="money-pos">${baht(thisMonth.data.sales)}</b></div>
+   <div class="card stat"><div class="lab">น้ำหนักแก๊ส</div><b>${thisMonth.data.kg.toLocaleString('th-TH')} kg</b></div>
+   <div class="card stat"><div class="lab">จำนวนบิล</div><b>${thisMonth.data.billCount}</b></div>
+   <div class="card stat"><div class="lab">กำไรขั้นต้น</div><b class="${thisMonth.data.profit>=0?'money-pos':'money-neg'}">${baht(thisMonth.data.profit)}</b></div>
+  </div>
+  <div class="card stat" style="margin-bottom:20px"><div class="lab">เงินเข้าจากบัญชีถังเดือนนี้</div><b class="money-pos">${baht(tankIncome)}</b></div>
+  <div class="card" style="padding:20px 16px">
+   <div style="font-size:13.5px;font-weight:700;margin-bottom:10px">เปรียบเทียบยอดขายรายเดือน (${monthsBack} เดือนล่าสุด)</div>
+   ${barChartSvg(bars.map(b=>({label:b.label, value:b.value})))}
+  </div>`;
+}
+registerModule({key:'reports', ic:'bars', label:'สรุปยอด', render:renderReports});
 function openDraftDocsDrill(){
  const list=db.docs.filter(d=>d.status==='ร่าง');
  const rows=list.map(d=>{
