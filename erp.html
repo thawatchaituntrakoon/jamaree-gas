@@ -2298,10 +2298,21 @@ function dailySummaryData(dateStr){
  const custCreditList=Object.entries(custCredit).map(([name,amount])=>({name,amount})).sort((a,b)=>b.amount-a.amount);
  return {date:dateStr, billCount:orders.length, sales, kg, cost, profit:sales-cost, cash, transfer, credit, creditBillCount, custCreditList};
 }
+/* ⭐ บัญชีถัง — แยกออกจาก "ยอดขาย" โดยเจตนา: ยืม/คืน/ฝาก/ถอนฝาก/เปลี่ยนถังชำรุด เป็นธุรกรรมภาชนะ (db.custody) ไม่ใช่ยอดขายสินค้าปกติ (db.orders)
+   เงินเข้าที่นับที่นี่ = เฉพาะ money.refType==='custody' (ยืมถัง/เปลี่ยนถังชำรุด มีรับเงินจริง) · ฝาก/ถอนฝาก/คืน ไม่มีเงินเข้าเลยแต่ยังนับจำนวนครั้งไว้ให้เห็นความเคลื่อนไหว */
+function tankSummaryData(dateStr){
+ const entries=db.custody.filter(c=>c.date===dateStr);
+ const counts={ยืม:0, คืน:0, ฝาก:0, ถอนฝาก:0, เปลี่ยนถังชำรุด:0};
+ entries.forEach(c=>{ if(counts[c.type]!==undefined) counts[c.type]++; });
+ const income=db.money.filter(m=>m.type==='เข้า' && m.refType==='custody' && m.date===dateStr).reduce((s,m)=>s+(Number(m.amount)||0),0);
+ return {date:dateStr, totalEntries:entries.length, counts, income};
+}
 function openDailySummary(dateStr){
  dateStr = dateStr || todayStr();
  const d=dailySummaryData(dateStr);
+ const t=tankSummaryData(dateStr);
  const custRows=d.custCreditList.map(x=>`<tr><td>${esc(x.name)}</td><td class="num money-neg">${baht(x.amount)}</td></tr>`).join('');
+ const tankCountRow=Object.entries(t.counts).map(([type,n])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span style="color:var(--muted)">${esc(type)}</span><b>${n} ครั้ง</b></div>`).join('');
  const body=`
   <div class="fld" style="max-width:200px"><label>วันที่</label><input type="date" value="${esc(dateStr)}" onchange="openDailySummary(this.value)"></div>
   <div class="grid g3" style="margin:18px 0 16px">
@@ -2320,7 +2331,15 @@ function openDailySummary(dateStr){
    <div class="card stat"><div class="lab">ค้างชำระ</div><b class="${d.credit>0?'money-neg':''}">${baht(d.credit)}</b></div>
   </div>
   <div style="font-size:13.5px;font-weight:700;margin-bottom:8px">ลูกค้าค้างชำระ ${d.creditBillCount} บิล</div>
-  ${custRows?tbl(['ลูกค้า',['ยอดค้าง','num']], custRows):empty('ไม่มีลูกค้าค้างชำระวันนี้ 🎉')}`;
+  ${custRows?tbl(['ลูกค้า',['ยอดค้าง','num']], custRows):empty('ไม่มีลูกค้าค้างชำระวันนี้ 🎉')}
+  <div style="border-top:2px solid var(--line);margin:28px 0 18px"></div>
+  <div style="font-size:15px;font-weight:700;margin-bottom:4px">บัญชีถัง</div>
+  <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px">แยกจากยอดขายด้านบน — นับจากธุรกรรมยืม/คืน/ฝาก/ถอนฝาก/เปลี่ยนถังชำรุดในหน้าลูกค้า</div>
+  <div class="grid g2" style="margin-bottom:16px">
+   <div class="card stat"><div class="lab">เงินเข้าจากบัญชีถัง (ยืมถัง+เปลี่ยนถังชำรุด)</div><b class="money-pos">${baht(t.income)}</b></div>
+   <div class="card stat"><div class="lab">ธุรกรรมถังทั้งหมด</div><b>${t.totalEntries} รายการ</b></div>
+  </div>
+  <div class="card" style="padding:14px 16px">${t.totalEntries?tankCountRow:'<div class="empty">ไม่มีธุรกรรมถังวันนี้</div>'}</div>`;
  showDetailPage('สรุปยอดต่อวัน', thDate(dateStr), body, {wide:true, backFn:"go('dash')"});
 }
 function openDraftDocsDrill(){
