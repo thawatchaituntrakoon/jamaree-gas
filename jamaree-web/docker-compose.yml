@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  jamaree-frontend:
+    container_name: jamaree-frontend
+    build: .
+    ports:
+      - "80:80"
+    restart: unless-stopped
