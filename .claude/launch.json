@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jamaree-local",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "cd '/private/tmp/claude-501/-Users-aaaaa-Desktop-Jamaree-App/88143541-beeb-4a5b-969b-fa3113bdadc0/scratchpad' && exec python3 -m http.server 8934"],
+      "port": 8934
+    }
+  ]
+}

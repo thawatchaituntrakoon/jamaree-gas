@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+/* โหมดมืดแบบ "ติดคลาส" — เปิดเมื่อ <html> มีคลาส dark
+   (Tailwind v4 ไม่มี tailwind.config.js แล้ว — darkMode:'class' เขียนแบบนี้แทน) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================
+   JAMAREE GAS — Design System
+   แปลงจาก CSS variables เดิมของ erp.html มาเป็น Tailwind theme
+   ห้ามใส่สี/ฟอนต์นอกชุดนี้
+
+   วิธีคิดโหมดมืด: ไม่ไปไล่ใส่ dark: ทีละจุดทั้งแอป
+   แต่สลับ "ค่าสี" ของชุดเดิมทั้งชุด — bg-paper / text-ink / border-line
+   ที่เขียนไว้แล้วทุกที่จะเปลี่ยนตามเองทันที (SSOT ของสีอยู่ที่เดียว)
+   ============================================================ */
+
+/* ---- โหมดสว่าง (ค่าตั้งต้น) ---- */
+:root {
+  --ds-ink: #16192d; /* หมึก — ตัวอักษรหลัก */
+  --ds-muted: #5b6172; /* เทาอ่อน — ตัวอักษรรอง */
+  --ds-line: #e6e8ef; /* เส้นขอบ */
+  --ds-paper: #f6f8fc; /* พื้นหลังหน้า */
+  --ds-card: #ffffff; /* พื้นการ์ด */
+  --ds-overlay: rgb(22 25 45 / 0.35); /* ฉากหลังตอนเปิดหน้าต่าง */
+
+  /* สีหลัก/สีสถานะ + ตัวอักษรที่วางทับสีเหล่านี้ */
+  --ds-accent: #2563eb;
+  --ds-accent2: #0d9488;
+  --ds-ok: #16a34a;
+  --ds-warn: #d97706;
+  --ds-danger: #dc2626;
+  --ds-on-accent: #ffffff;
+
+  /* พื้นอ่อนของ accent/สถานะ — โหมดสว่างใช้สีพาสเทล */
+  --ds-accent-soft: #eff4ff;
+  --ds-accent2-soft: #e6f5f3;
+  --ds-ok-soft: #e8f6ed;
+  --ds-warn-soft: #fdf3e3;
+  --ds-danger-soft: #fdeaea;
+
+  --ds-shadow-card:
+    0 1px 2px rgb(22 25 45 / 0.04), 0 10px 24px -14px rgb(22 25 45 / 0.18);
+  --ds-shadow-pop: 0 8px 30px -10px rgb(22 25 45 / 0.22);
+
+  color-scheme: light;
+}
+
+/* ---- โหมดมืด ---- */
+/* สีหลัก (น้ำเงิน) และสีสถานะ เขียว/ส้ม/แดง ใช้ค่าเดิมทั้งคู่ — ความหมายของสีต้องไม่เปลี่ยน
+   ส่วน "พื้นอ่อน" ของแต่ละสีเปลี่ยนเป็นสีจาง ๆ บนพื้นมืดแทน ไม่งั้นอ่านไม่ออก */
+.dark {
+  --ds-ink: #f8fafc; /* slate-50 */
+  --ds-muted: #94a3b8; /* slate-400 */
+  --ds-line: #334155; /* slate-700 */
+  --ds-paper: #0f172a; /* slate-900 */
+  --ds-card: #1e293b; /* slate-800 */
+  --ds-overlay: rgb(2 6 23 / 0.6);
+
+  /* สียังคงความหมายเดิม (น้ำเงิน/เขียว/ส้ม/แดง)
+     แต่จางขึ้นหนึ่งขั้น — สีเข้มเดิมบนพื้นมืดจะอ่านไม่ออก
+     ส่วนตัวอักษรบนปุ่มสีทึบกลับเป็นสีเข้มแทน */
+  --ds-accent: #60a5fa;
+  --ds-accent2: #2dd4bf;
+  --ds-ok: #4ade80;
+  --ds-warn: #fbbf24;
+  --ds-danger: #f87171;
+  --ds-on-accent: #0f172a;
+
+  --ds-accent-soft: rgb(37 99 235 / 0.22);
+  --ds-accent2-soft: rgb(13 148 136 / 0.22);
+  --ds-ok-soft: rgb(22 163 74 / 0.22);
+  --ds-warn-soft: rgb(217 119 6 / 0.24);
+  --ds-danger-soft: rgb(220 38 38 / 0.22);
+
+  --ds-shadow-card:
+    0 1px 2px rgb(0 0 0 / 0.3), 0 10px 24px -14px rgb(0 0 0 / 0.6);
+  --ds-shadow-pop: 0 8px 30px -10px rgb(0 0 0 / 0.7);
+
+  color-scheme: dark;
+}
+
+/* inline = ให้ utility ชี้ไปที่ตัวแปรตรง ๆ จะได้สลับค่าตอนรันได้ */
+@theme inline {
+  /* ---- โทนสีหลัก ---- */
+  --color-ink: var(--ds-ink);
+  --color-muted: var(--ds-muted);
+  --color-line: var(--ds-line);
+  --color-paper: var(--ds-paper);
+  --color-card: var(--ds-card);
+  --color-overlay: var(--ds-overlay);
+  /* ตัวอักษรบนปุ่ม/ป้ายสีทึบ (ขาวในโหมดสว่าง / เข้มในโหมดมืด) */
+  --color-on-accent: var(--ds-on-accent);
+
+  /* ---- accent ---- */
+  --color-accent: var(--ds-accent); /* น้ำเงิน — ปุ่มหลัก/ลิงก์ */
+  --color-accent-soft: var(--ds-accent-soft);
+  --color-accent2: var(--ds-accent2); /* เขียวมิ้นต์ — accent รอง */
+  --color-accent2-soft: var(--ds-accent2-soft);
+
+  /* ---- สถานะ (สีต้องมีความหมายเสมอ) ---- */
+  --color-ok: var(--ds-ok); /* เข้า / สำเร็จ */
+  --color-ok-soft: var(--ds-ok-soft);
+  --color-warn: var(--ds-warn); /* รอ / ใกล้ถึง */
+  --color-warn-soft: var(--ds-warn-soft);
+  --color-danger: var(--ds-danger); /* ออก / เกินกำหนด */
+  --color-danger-soft: var(--ds-danger-soft);
+
+  /* ---- เงานุ่ม (ไม่ใช่เงาหนา) ---- */
+  --shadow-card: var(--ds-shadow-card);
+  --shadow-pop: var(--ds-shadow-pop);
+}
+
+@theme {
+  /* ---- ฟอนต์ ---- */
+  --font-sans: "Anuphan", ui-sans-serif, system-ui, sans-serif;
+  --font-head: "Bai Jamjuree", "Anuphan", ui-sans-serif, system-ui, sans-serif;
+
+  /* ---- มุมมน ---- */
+  --radius-card: 16px;
+  --radius-btn: 11px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-head font-semibold text-ink;
+  }
+
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+/* ตอนสั่งพิมพ์ — โชว์เฉพาะใบเอกสาร ซ่อนเมนู/ปุ่มทั้งหมด */
+@media print {
+  /* เอกสารพิมพ์ลงกระดาษขาวเสมอ แม้กำลังใช้โหมดมืดอยู่ */
+  :root,
+  .dark {
+    --ds-ink: #16192d;
+    --ds-muted: #5b6172;
+    --ds-line: #e6e8ef;
+    --ds-paper: #ffffff;
+    --ds-card: #ffffff;
+    --ds-accent: #2563eb;
+    --ds-ok: #16a34a;
+    --ds-warn: #d97706;
+    --ds-danger: #dc2626;
+    --ds-on-accent: #ffffff;
+    color-scheme: light;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+
+  .print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 0;
+    color: #000;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}
