@@ -1,0 +1,19 @@
+{
+  "name": "jamaree-scripts",
+  "private": true,
+  "type": "module",
+  "description": "สคริปต์ย้ายข้อมูลจากไฟล์สำรองเดิม (erp.html) ขึ้น Supabase",
+  "scripts": {
+    "import:products": "node scripts/importProducts.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}
