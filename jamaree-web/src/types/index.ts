@@ -291,11 +291,26 @@ export type PayType = "รายเดือน" | "รายวัน";
 export type LeaveStatus = "ขอ" | "อนุมัติ" | "ไม่อนุมัติ";
 export type PayrollStatus = "ร่าง" | "จ่ายแล้ว";
 
+/** สิทธิ์เข้าใช้ระบบ — คนละเรื่องกับ staff.role ที่เป็นชื่อตำแหน่งงาน */
+export type AccessRole =
+  | "SUPER_ADMIN"
+  | "MANAGER"
+  | "FINANCE"
+  | "SALES"
+  | "DELIVERY"
+  | "FILLER"
+  | "GENERAL";
+
 export interface Staff {
   id: UUID;
   name: string;
   nickname: string | null;
+  /** ตำแหน่งงานที่พิมพ์เอง — ไม่เกี่ยวกับสิทธิ์ */
   role: string | null;
+  /** สิทธิ์เข้าใช้ระบบ */
+  access_role: AccessRole;
+  /** บัญชีเข้าสู่ระบบของคนนี้ — ว่าง = ยังไม่ได้เปิดบัญชีให้ */
+  user_id: UUID | null;
   phone: string | null;
   pay_type: PayType;
   salary: number;

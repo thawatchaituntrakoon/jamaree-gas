@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Pencil, Plus, UserRoundX } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
@@ -8,27 +8,62 @@ import { DataTable } from "@/components/ui/DataTable";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { fmtBaht, fmtDate, todayStr } from "@/lib/constants";
+import { ThaiAddressInput } from "@/components/ui/ThaiAddressInput";
+import {
+  ACCESS_ROLES,
+  accessRoleLabel,
+  fmtBaht,
+  fmtDate,
+  todayStr,
+} from "@/lib/constants";
+import { EMPTY_ADDRESS, composeAddress, parseAddress } from "@/lib/thaiAddress";
+import type { ThaiAddressParts } from "@/lib/thaiAddress";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
-import type { PayType, Staff, StaffInput } from "@/types";
+import { useAuthStore } from "@/store/useAuthStore";
+import type { AccessRole, PayType, Staff, StaffInput } from "@/types";
 
 const PAY_TYPES: ReadonlyArray<PayType> = ["รายเดือน", "รายวัน"];
 
 export function StaffPage() {
   const { staff } = useDerived();
   const saveStaff = useAppStore((s) => s.saveStaff);
+  const myRole = useAuthStore((s) => s.role);
+  const myStaffId = useAuthStore((s) => s.profile?.id ?? null);
 
   const [showLeft, setShowLeft] = useState(false);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
   const [form, setForm] = useState<StaffInput>({ name: "" });
+  const [street, setStreet] = useState("");
+  const [addr, setAddr] = useState<ThaiAddressParts>(EMPTY_ADDRESS);
   const [endFor, setEndFor] = useState<Staff | null>(null);
   const [endDate, setEndDate] = useState(todayStr());
   const [endReason, setEndReason] = useState("");
 
+  // กันผลแยกที่อยู่ของคนเก่ามาทับ ตอนกดสลับคนเร็ว ๆ
+  const addrToken = useRef(0);
+
   const rows = staff.filter((s) => (showLeft ? true : !s.terminated_at));
+
+  /**
+   * ใครแก้สิทธิ์ของใครได้บ้าง
+   * ผู้จัดการแต่งตั้งผู้ดูแลระบบสูงสุดไม่ได้ และแก้สิทธิ์ของผู้ดูแลระบบสูงสุดไม่ได้ — กันยกตัวเองขึ้นเป็นเจ้าของ
+   * ตัวเองก็แก้สิทธิ์ตัวเองไม่ได้ — กันลดสิทธิ์ตัวเองจนเข้าระบบไม่ได้อีก
+   */
+  function roleEditable(target: Staff | null) {
+    if (myRole !== "SUPER_ADMIN" && myRole !== "MANAGER") return false;
+    if (target && target.id === myStaffId) return false;
+    if (myRole === "MANAGER" && target?.access_role === "SUPER_ADMIN")
+      return false;
+    return true;
+  }
+
+  const canEditRole = roleEditable(editing);
+  const roleOptions = ACCESS_ROLES.filter(
+    (r) => r.value !== "SUPER_ADMIN" || myRole === "SUPER_ADMIN",
+  );
 
   function openForm(s: Staff | null) {
     setEditing(s);
@@ -38,6 +73,7 @@ export function StaffPage() {
             name: s.name,
             nickname: s.nickname,
             role: s.role,
+            access_role: s.access_role,
             phone: s.phone,
             pay_type: s.pay_type,
             salary: s.salary,
@@ -48,19 +84,38 @@ export function StaffPage() {
             bank_account: s.bank_account,
             note: s.note,
           }
-        : { name: "", pay_type: "รายเดือน", start_date: todayStr() },
+        : {
+            name: "",
+            pay_type: "รายเดือน",
+            start_date: todayStr(),
+            access_role: "GENERAL",
+          },
     );
+    // เปิดหน้าต่างทันทีด้วยที่อยู่เดิมทั้งก้อน แล้วค่อยแยกช่องให้ทีหลัง
+    setStreet(s?.address ?? "");
+    setAddr(EMPTY_ADDRESS);
     setOpen(true);
+
+    const token = (addrToken.current += 1);
+    void parseAddress(s?.address).then(({ street: line, parts }) => {
+      if (addrToken.current !== token) return;
+      setStreet(line);
+      setAddr(parts);
+    });
   }
 
   async function submit() {
     if (!form.name?.trim()) return;
     setBusy(true);
     try {
+      // ไม่มีสิทธิ์แต่งตั้ง = ไม่ส่งช่องสิทธิ์ไปเลย ของเดิมในฐานข้อมูลจะได้ไม่ถูกทับ
+      const { access_role, ...rest } = form;
       await saveStaff(
         {
-          ...form,
+          ...rest,
+          ...(canEditRole ? { access_role } : {}),
           name: form.name.trim(),
+          address: await composeAddress(street, addr),
           salary: Number(form.salary) || 0,
           daily_rate: Number(form.daily_rate) || 0,
         },
@@ -148,6 +203,15 @@ export function StaffPage() {
                   )}
                   {s.role && <p className="text-xs text-muted">{s.role}</p>}
                 </div>
+              ),
+            },
+            {
+              header: "สิทธิ์",
+              hideOnMobile: true,
+              cell: (s) => (
+                <span className="text-muted">
+                  {accessRoleLabel(s.access_role)}
+                </span>
               ),
             },
             { header: "เบอร์โทร", hideOnMobile: true, cell: (s) => s.phone },
@@ -257,6 +321,33 @@ export function StaffPage() {
                 />
               )}
             </Field>
+            <Field
+              label="สิทธิ์เข้าใช้ระบบ"
+              hint={
+                canEditRole
+                  ? ACCESS_ROLES.find((r) => r.value === form.access_role)?.hint
+                  : editing?.id === myStaffId
+                    ? "แก้สิทธิ์ของตัวเองไม่ได้ ให้คนอื่นแก้ให้"
+                    : "เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่แก้สิทธิ์นี้ได้"
+              }
+            >
+              {(id) => (
+                <Select
+                  id={id}
+                  value={form.access_role ?? "GENERAL"}
+                  disabled={!canEditRole}
+                  onChange={(e) =>
+                    set({ access_role: e.target.value as AccessRole })
+                  }
+                >
+                  {roleOptions.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
             <Field label="เบอร์โทร">
               {(id) => (
                 <TextInput
@@ -346,16 +437,19 @@ export function StaffPage() {
             </Field>
           </div>
 
-          <Field label="ที่อยู่">
+          <Field label="ที่อยู่" hint="บ้านเลขที่ อาคาร หมู่ ซอย ถนน">
             {(id) => (
-              <TextArea
+              <TextInput
                 id={id}
-                rows={2}
-                value={form.address ?? ""}
-                onChange={(e) => set({ address: e.target.value })}
+                value={street}
+                onChange={(e) => setStreet(e.target.value)}
+                placeholder="เช่น 99/9 หมู่ 5 ถนนสุขุมวิท"
               />
             )}
           </Field>
+
+          <ThaiAddressInput value={addr} onChange={setAddr} />
+
           <Field label="หมายเหตุ">
             {(id) => (
               <TextArea

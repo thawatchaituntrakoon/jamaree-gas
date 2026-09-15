@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
 import { Flame, LogOut, X } from "lucide-react";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { accessRoleLabel } from "@/lib/constants";
 import { NAV_GROUPS } from "@/lib/nav";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { useSession } from "@/lib/useSession";
+import { isSupabaseConfigured } from "@/lib/supabase";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface SidebarProps {
   /** เปิดอยู่ไหมบนจอมือถือ */
@@ -14,9 +15,19 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
-  const { session } = useSession();
+  const session = useAuthStore((s) => s.session);
+  const profile = useAuthStore((s) => s.profile);
+  const role = useAuthStore((s) => s.role);
+  const can = useAuthStore((s) => s.can);
+  const signOut = useAuthStore((s) => s.signOut);
   // บนมือถือตอนเมนูปิด เมนูยังลอยอยู่นอกจอ — ปิดไม่ให้กด Tab ไปโดนได้
   const hidden = !isDesktop && !open;
+
+  // เหลือเฉพาะเมนูที่เปิดได้จริง หมวดไหนไม่เหลืออะไรก็ไม่ต้องโชว์หัวข้อ
+  const groups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => can(i.roles)),
+  })).filter((g) => g.items.length > 0);
 
   return (
     <>
@@ -60,7 +71,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         <GlobalSearch onNavigate={onClose} />
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {NAV_GROUPS.map((group) => (
+          {groups.map((group) => (
             <div key={group.label} className="mb-5 last:mb-0">
               <p className="mb-1.5 px-2 text-xs font-medium text-muted">
                 {group.label}
@@ -98,12 +109,17 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
         {isSupabaseConfigured && session && (
           <div className="border-t border-line px-3 py-3">
-            <p className="mb-1.5 truncate px-2.5 text-xs text-muted">
-              {session.user.email}
-            </p>
+            <div className="mb-1.5 px-2.5">
+              <p className="truncate text-sm text-ink">
+                {profile?.name ?? session.user.email}
+              </p>
+              <p className="truncate text-xs text-muted">
+                {accessRoleLabel(role)}
+              </p>
+            </div>
             <button
               type="button"
-              onClick={() => void supabase.auth.signOut()}
+              onClick={() => void signOut()}
               className="flex w-full items-center gap-2.5 rounded-btn px-2.5 py-2 text-sm text-ink transition-colors hover:bg-paper"
             >
               <LogOut size={17} className="shrink-0" />

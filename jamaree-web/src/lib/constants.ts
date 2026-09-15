@@ -1,4 +1,5 @@
 import type {
+  AccessRole,
   CustodyType,
   DocStatus,
   DocType,
@@ -69,6 +70,45 @@ export const DOC_STATUSES: ReadonlyArray<DocStatus> = [
 ];
 
 export const PERSON_TYPES: ReadonlyArray<PersonType> = ["บุคคล", "นิติบุคคล"];
+
+/** สิทธิ์เข้าใช้ระบบ — เรียงจากสิทธิ์มากไปน้อย */
+export const ACCESS_ROLES: ReadonlyArray<{
+  value: AccessRole;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: "SUPER_ADMIN",
+    label: "ผู้ดูแลระบบสูงสุด",
+    hint: "เข้าได้ทุกหน้า รวมถึงตั้งสิทธิ์คนอื่น",
+  },
+  {
+    value: "MANAGER",
+    label: "ผู้จัดการ",
+    hint: "ดูแลงานทั้งร้าน ยกเว้นการตั้งค่าระบบ",
+  },
+  {
+    value: "FINANCE",
+    label: "พนักงานการเงิน",
+    hint: "เงิน เอกสาร บัญชี สรุปยอด",
+  },
+  { value: "SALES", label: "พนักงานขาย", hint: "ขายหน้าร้าน ลูกค้า ออเดอร์" },
+  { value: "DELIVERY", label: "พนักงานส่งของ", hint: "บอร์ดงาน งานที่ต้องส่ง" },
+  {
+    value: "FILLER",
+    label: "พนักงานบรรจุแก๊ส",
+    hint: "คลังสินค้า ถัง การเคลื่อนไหว",
+  },
+  {
+    value: "GENERAL",
+    label: "พนักงานทั่วไป",
+    hint: "เข้าได้เฉพาะงานของตัวเอง",
+  },
+];
+
+export function accessRoleLabel(role: AccessRole): string {
+  return ACCESS_ROLES.find((r) => r.value === role)?.label ?? role;
+}
 
 export const PO_STATUSES: ReadonlyArray<PoStatus> = [
   "ร่าง",

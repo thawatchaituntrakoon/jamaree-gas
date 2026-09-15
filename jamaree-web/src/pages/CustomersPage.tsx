@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Pencil, Plus, Search } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -8,7 +8,10 @@ import { DataTable } from "@/components/ui/DataTable";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ThaiAddressInput } from "@/components/ui/ThaiAddressInput";
 import { PERSON_TYPES, fmtBaht } from "@/lib/constants";
+import { EMPTY_ADDRESS, composeAddress, parseAddress } from "@/lib/thaiAddress";
+import type { ThaiAddressParts } from "@/lib/thaiAddress";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
 import type { Customer, CustomerInput, PersonType } from "@/types";
@@ -31,8 +34,13 @@ export function CustomersPage() {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Customer | null>(null);
   const [form, setForm] = useState<CustomerInput>(BLANK);
+  const [street, setStreet] = useState("");
+  const [addr, setAddr] = useState<ThaiAddressParts>(EMPTY_ADDRESS);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // กันผลแยกที่อยู่ของรายเก่ามาทับ ตอนกดสลับลูกค้าเร็ว ๆ
+  const addrToken = useRef(0);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -45,8 +53,11 @@ export function CustomersPage() {
   }, [customers, query]);
 
   function openNew() {
+    addrToken.current += 1;
     setEditing(null);
     setForm(BLANK);
+    setStreet("");
+    setAddr(EMPTY_ADDRESS);
     setOpen(true);
   }
 
@@ -61,7 +72,17 @@ export function CustomersPage() {
       address: c.address ?? "",
       price_tier_id: c.price_tier_id,
     });
+    // เปิดหน้าต่างทันทีด้วยที่อยู่เดิมทั้งก้อน แล้วค่อยแยกช่องให้ทีหลัง
+    setStreet(c.address ?? "");
+    setAddr(EMPTY_ADDRESS);
     setOpen(true);
+
+    const token = (addrToken.current += 1);
+    void parseAddress(c.address).then(({ street: line, parts }) => {
+      if (addrToken.current !== token) return;
+      setStreet(line);
+      setAddr(parts);
+    });
   }
 
   async function submit() {
@@ -72,6 +93,7 @@ export function CustomersPage() {
         {
           ...form,
           name: form.name.trim(),
+          address: await composeAddress(street, addr),
           price_tier_id: form.price_tier_id || null,
         },
         editing?.id,
@@ -273,16 +295,18 @@ export function CustomersPage() {
             )}
           </Field>
 
-          <Field label="ที่อยู่">
+          <Field label="ที่อยู่" hint="บ้านเลขที่ อาคาร หมู่ ซอย ถนน">
             {(id) => (
-              <TextArea
+              <TextInput
                 id={id}
-                rows={2}
-                value={form.address ?? ""}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                value={street}
+                onChange={(e) => setStreet(e.target.value)}
+                placeholder="เช่น 99/9 หมู่ 5 ถนนสุขุมวิท"
               />
             )}
           </Field>
+
+          <ThaiAddressInput value={addr} onChange={setAddr} />
 
           <Field label="โน้ต">
             {(id) => (

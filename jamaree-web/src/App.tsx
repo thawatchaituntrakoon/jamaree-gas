@@ -1,11 +1,12 @@
-import { lazy } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import type { ComponentType } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { NAV_ITEMS } from "@/lib/nav";
+import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
+import { NAV_ITEMS, rolesFor } from "@/lib/nav";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { useSession } from "@/lib/useSession";
+import { useAuthStore } from "@/store/useAuthStore";
 import { ComingSoonPage } from "@/pages/ComingSoonPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { LoginPage } from "@/pages/LoginPage";
@@ -71,6 +72,9 @@ const BoardPage = lazy(() =>
 const ReportsPage = lazy(() =>
   import("@/pages/ReportsPage").then((m) => ({ default: m.ReportsPage })),
 );
+const PosPage = lazy(() =>
+  import("@/pages/PosPage").then((m) => ({ default: m.PosPage })),
+);
 
 /** หน้าที่ทำเสร็จแล้ว — เมนูที่เหลือจะขึ้นหน้า "กำลังย้าย" ให้อัตโนมัติ */
 const READY_PAGES: Record<string, ComponentType> = {
@@ -90,7 +94,11 @@ const READY_PAGES: Record<string, ComponentType> = {
 };
 
 export default function App() {
-  const { session, ready } = useSession();
+  const session = useAuthStore((s) => s.session);
+  const ready = useAuthStore((s) => s.ready);
+  const init = useAuthStore((s) => s.init);
+
+  useEffect(() => init(), [init]);
 
   if (!ready) {
     return (
@@ -107,19 +115,86 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<DashboardLayout />}>
-          <Route index element={<DashboardPage />} />
+        {/* ขายหน้าร้าน — กินจอทั้งใบ ไม่มีเมนูข้างมาแย่งที่ตอนขายจริง */}
+        <Route
+          path="/pos"
+          element={
+            // หน้านี้อยู่นอกเมนูหลัก เด้งกลับหน้าแรกอ่านง่ายกว่าโชว์การ์ดลอย ๆ
+            <ProtectedRoute allowedRoles={rolesFor("/pos")} redirectTo="/">
+              <Suspense
+                fallback={
+                  <div className="flex h-dvh items-center justify-center gap-2.5 bg-paper text-muted">
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>กำลังเปิดหน้าขาย…</span>
+                  </div>
+                }
+              >
+                <PosPage />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
 
-          {NAV_ITEMS.filter((item) => item.path !== "/").map((item) => {
+        <Route element={<DashboardLayout />}>
+          <Route
+            index
+            element={
+              <ProtectedRoute allowedRoles={rolesFor("/")}>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {NAV_ITEMS.filter(
+            (item) => item.path !== "/" && !item.standalone,
+          ).map((item) => {
             const Page = READY_PAGES[item.path] ?? ComingSoonPage;
-            return <Route key={item.key} path={item.path} element={<Page />} />;
+            return (
+              <Route
+                key={item.key}
+                path={item.path}
+                element={
+                  <ProtectedRoute allowedRoles={item.roles}>
+                    <Page />
+                  </ProtectedRoute>
+                }
+              />
+            );
           })}
 
           {/* หน้ารายละเอียดรายตัว — คลิกทะลุจากตารางไหนก็ได้ */}
-          <Route path="/customers/:id" element={<CustomerDetailPage />} />
-          <Route path="/products/:id" element={<ProductDetailPage />} />
-          <Route path="/orders/:id" element={<OrderDetailPage />} />
-          <Route path="/docs/:id" element={<DocDetailPage />} />
+          <Route
+            path="/customers/:id"
+            element={
+              <ProtectedRoute allowedRoles={rolesFor("/customers")}>
+                <CustomerDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/products/:id"
+            element={
+              <ProtectedRoute allowedRoles={rolesFor("/products")}>
+                <ProductDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orders/:id"
+            element={
+              <ProtectedRoute allowedRoles={rolesFor("/orders")}>
+                <OrderDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/docs/:id"
+            element={
+              <ProtectedRoute allowedRoles={rolesFor("/docs")}>
+                <DocDetailPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="/404" element={<NotFoundPage />} />
           <Route path="*" element={<Navigate to="/404" replace />} />

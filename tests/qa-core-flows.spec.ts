@@ -133,9 +133,17 @@ test.describe("ระบบหลัก", () => {
     await expect(page.getByText(product.name).first()).toBeVisible();
 
     await test.step("ปิดบิล & ตัดสต๊อก", async () => {
-      const close = page.getByRole("button", { name: "ปิดบิล & ตัดสต๊อก" });
-      await close.click();
-      await expect(close).toBeHidden({ timeout: 20_000 });
+      // ปุ่มเปลี่ยนข้อความเป็น "กำลังปิดบิล…" ทันทีที่กด — รอแค่ปุ่มหายจะวิ่งไปอ่านสต๊อกก่อนฐานข้อมูลตัดจริง
+      const rpc = page.waitForResponse(
+        (r) =>
+          r.url().includes("/rpc/complete_order") &&
+          r.request().method() === "POST",
+        { timeout: 30_000 },
+      );
+      await page.getByRole("button", { name: "ปิดบิล & ตัดสต๊อก" }).click();
+      const res = await rpc;
+      expect(res.ok(), `ปิดบิลไม่สำเร็จ (HTTP ${res.status()})`).toBeTruthy();
+      await expect(page.getByText("ตัดสต๊อกเรียบร้อยแล้ว")).toBeVisible();
     });
 
     const after = await readStock(page, product.name);

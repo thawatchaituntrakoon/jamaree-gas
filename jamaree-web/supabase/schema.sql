@@ -2082,4 +2082,73 @@ create policy "ผู้ใช้ที่ล็อกอินแล้วล�
   using (bucket_id = 'product-images');
 
 
+-- ============================================================
+-- 13. สิทธิ์การใช้งาน (เพิ่มรอบที่ 9 — รันซ้ำได้)
+--
+-- ⭐ staff.role เดิมคือ "ตำแหน่งงาน" ที่พิมพ์เอง (เช่น คนขับรถส่งแก๊ส) — ไม่แตะ
+--    สิทธิ์เข้าใช้ระบบเก็บแยกที่ access_role เพื่อไม่ให้ข้อมูลเดิมพัง
+-- ============================================================
+
+alter table public.staff
+  add column if not exists user_id uuid references auth.users (id) on delete set null;
+
+alter table public.staff
+  add column if not exists access_role text not null default 'GENERAL';
+
+comment on column public.staff.role is
+  'ตำแหน่งงานที่พิมพ์เอง เช่น คนขับรถส่งแก๊ส — ไม่เกี่ยวกับสิทธิ์เข้าใช้ระบบ';
+comment on column public.staff.access_role is
+  'สิทธิ์เข้าใช้ระบบ — SUPER_ADMIN/MANAGER/FINANCE/SALES/DELIVERY/FILLER/GENERAL';
+comment on column public.staff.user_id is
+  'บัญชีเข้าสู่ระบบของคนนี้ (auth.users) — ว่าง = ยังไม่ได้เปิดบัญชีให้';
+
+-- คอลัมน์อาจถูกสร้างไปแล้วรอบก่อน จึงผูก check แยกไว้ (add column if not exists จะไม่ใส่ให้)
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'staff_access_role_chk') then
+    alter table public.staff add constraint staff_access_role_chk
+      check (access_role in (
+        'SUPER_ADMIN', 'MANAGER', 'FINANCE', 'SALES', 'DELIVERY', 'FILLER', 'GENERAL'
+      ));
+  end if;
+end;
+$$;
+
+-- 1 บัญชีล็อกอิน = พนักงานได้คนเดียว (ว่างได้หลายแถว)
+create unique index if not exists staff_user_id_uidx
+  on public.staff (user_id) where user_id is not null;
+
+-- ⭐ security definer — ถ้าให้ policy ของ staff ไปอ่านตาราง staff เองจะวนไม่จบ
+create or replace function public.my_role()
+returns text
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select coalesce(
+    (select access_role from public.staff
+      where user_id = auth.uid() and terminated_at is null
+      limit 1),
+    'GENERAL'
+  );
+$$;
+
+/** คนที่ล็อกอินอยู่มีสิทธิ์ตัวใดตัวหนึ่งในนี้ไหม — ไว้เขียน RLS ให้อ่านง่าย */
+create or replace function public.has_role(p_roles text[])
+returns boolean
+language sql
+stable
+set search_path = public, pg_temp
+as $$
+  select auth.uid() is not null and public.my_role() = any (p_roles);
+$$;
+
+revoke all on function public.my_role()          from public, anon;
+revoke all on function public.has_role(text[])   from public, anon;
+grant execute on function public.my_role()        to authenticated;
+grant execute on function public.has_role(text[]) to authenticated;
+
+
+
 

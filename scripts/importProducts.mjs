@@ -52,6 +52,14 @@ const VALID_KINDS = new Set([
 /** ชนิดที่ต้องบอกกิโลต่อถัง ไม่งั้นตอนขายจะตัดแก๊สดิบไม่ได้ */
 const NEEDS_FILL_KG = new Set(["น้ำแก๊ส", "หมุนเวียน"]);
 
+// Node 20 ยังไม่มี WebSocket ในตัว (มีตั้งแต่ 22) — supabase-js จะไม่ยอมสร้าง client ถ้าไม่ยื่นตัวนี้ให้
+const CLIENT_OPTIONS = {
+  auth: { persistSession: false, autoRefreshToken: false },
+  ...(globalThis.WebSocket
+    ? {}
+    : { realtime: { transport: (await import("ws")).default } }),
+};
+
 const num = (v, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -78,9 +86,7 @@ async function connect() {
     console.log(
       "🔑 ใช้ service_role key (ข้าม RLS) — ห้าม commit คีย์นี้เข้า git",
     );
-    return createClient(url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    return createClient(url, serviceKey, CLIENT_OPTIONS);
   }
 
   if (!anonKey)
@@ -95,9 +101,7 @@ async function connect() {
     );
   }
 
-  const db = createClient(url, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const db = createClient(url, anonKey, CLIENT_OPTIONS);
   const { error } = await db.auth.signInWithPassword({ email, password });
   if (error) die(`ล็อกอินไม่ผ่าน: ${error.message}`);
   console.log(`🔑 ล็อกอินเป็น ${email}`);
