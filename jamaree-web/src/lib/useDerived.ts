@@ -20,6 +20,7 @@ export function useDerived() {
   const {
     products,
     customers,
+    priceSetItems,
     orders,
     transactions,
     custody,
@@ -35,6 +36,7 @@ export function useDerived() {
     useShallow((s) => ({
       products: s.products,
       customers: s.customers,
+      priceSetItems: s.priceSetItems,
       orders: s.orders,
       transactions: s.transactions,
       custody: s.custody,
@@ -60,14 +62,26 @@ export function useDerived() {
     const priceFor = (productId: UUID, customerId?: UUID | null): number => {
       const product = productById(productId);
       if (!product) return 0;
-      const tierId = customerById(customerId)?.price_tier_id;
-      if (tierId) {
-        const tierPrice = product.tier_prices?.[tierId];
-        if (tierPrice != null && String(tierPrice) !== "") {
-          return Number(tierPrice) || 0;
-        }
+      const setId = customerById(customerId)?.price_tier_id;
+      if (setId) {
+        const item = priceSetItems.find(
+          (i) => i.price_set_id === setId && i.product_id === productId,
+        );
+        if (item?.custom_price != null) return Number(item.custom_price) || 0;
       }
       return Number(product.price) || 0;
+    };
+
+    /** ชุดราคาของลูกค้ามีราคาเฉพาะของสินค้าตัวนี้ไหม — ไว้บอกบนฟอร์มว่าราคามาจากไหน */
+    const hasCustomPrice = (
+      productId: UUID,
+      customerId?: UUID | null,
+    ): boolean => {
+      const setId = customerById(customerId)?.price_tier_id;
+      if (!setId) return false;
+      return priceSetItems.some(
+        (i) => i.price_set_id === setId && i.product_id === productId,
+      );
     };
 
     const orderTotal = (order: Order) =>
@@ -323,6 +337,7 @@ export function useDerived() {
       customerById,
       customerName,
       priceFor,
+      hasCustomPrice,
       orderTotal,
       orderProfit,
       orderOutstanding,
@@ -366,6 +381,7 @@ export function useDerived() {
   }, [
     products,
     customers,
+    priceSetItems,
     orders,
     transactions,
     custody,

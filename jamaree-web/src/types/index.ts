@@ -54,11 +54,25 @@ export type CustodyType = "ยืม" | "คืน" | "ฝาก" | "ถอน�
 
 /* ============ ทะเบียน (Master) ============ */
 
-/** ชุดราคา — ลูกค้าคนละกลุ่มได้ราคาต่างกัน (มี 10 ชุดตายตัว) */
+/** ชุดราคา — ลูกค้าคนละกลุ่มได้ราคาต่างกัน (ตาราง price_tiers) */
 export interface PriceTier {
   id: UUID;
   name: string;
   sort_order: number;
+  description: string | null;
+}
+
+/** ชื่อเรียกใหม่ของ PriceTier — ใช้ชื่อนี้ในโค้ดใหม่ได้เลย เป็นตัวเดียวกัน */
+export type PriceSet = PriceTier;
+
+/** ราคาเฉพาะของสินค้า 1 ตัว ในชุดราคา 1 ชุด — ไม่มีแถว = ใช้ราคาปกติของสินค้า */
+export interface PriceSetItem {
+  id: UUID;
+  /** ชี้ไปที่ price_tiers.id */
+  price_set_id: UUID;
+  product_id: UUID;
+  custom_price: number;
+  created_at: ISODateTime;
 }
 
 export interface Customer {
@@ -92,7 +106,9 @@ export interface Product {
   cost: number | null;
   /** ปิดการขายแทนการลบ (ห้ามลบสินค้าที่มีประวัติ) */
   active: boolean;
-  /** ราคาแยกตามชุดราคา { [price_tier_id]: ราคา } — ไม่ตั้งไว้ = ใช้ราคาปกติ */
+  /** ลิงก์รูปสินค้า — ไม่มีก็ได้ */
+  image_url: string | null;
+  /** @deprecated ย้ายไปตาราง price_set_items แล้ว — เหลือไว้เผื่อย้อนข้อมูลเท่านั้น */
   tier_prices: Record<UUID, number>;
   created_at: ISODateTime;
 }
@@ -399,6 +415,11 @@ type NewOf<T, Required extends keyof T> = Partial<
 
 export type CustomerInput = NewOf<Customer, "name">;
 export type ProductInput = NewOf<Product, "name">;
+export type PriceSetInput = NewOf<PriceTier, "name">;
+export type PriceSetItemInput = NewOf<
+  PriceSetItem,
+  "price_set_id" | "product_id" | "custom_price"
+>;
 export type TransactionInput = NewOf<Transaction, "type" | "amount">;
 export type MoneyCategoryInput = NewOf<MoneyCategory, "name" | "type">;
 export type CustodyInput = NewOf<

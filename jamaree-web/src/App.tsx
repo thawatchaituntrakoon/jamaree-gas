@@ -28,6 +28,9 @@ const ProductDetailPage = lazy(() =>
     default: m.ProductDetailPage,
   })),
 );
+const PriceSetsPage = lazy(() =>
+  import("@/pages/PriceSetsPage").then((m) => ({ default: m.PriceSetsPage })),
+);
 const OrdersPage = lazy(() =>
   import("@/pages/OrdersPage").then((m) => ({ default: m.OrdersPage })),
 );
@@ -74,6 +77,7 @@ const READY_PAGES: Record<string, ComponentType> = {
   "/customers": CustomersPage,
   "/orders": OrdersPage,
   "/products": ProductsPage,
+  "/price-sets": PriceSetsPage,
   "/money": MoneyPage,
   "/docs": DocsPage,
   "/purchases": PurchasesPage,

@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Package,
   ShoppingCart,
+  Tags,
   Truck,
   Users,
   UsersRound,
@@ -65,6 +66,12 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { key: "customers", label: "ลูกค้า", path: "/customers", icon: Users },
       { key: "orders", label: "ออเดอร์", path: "/orders", icon: ShoppingCart },
+      {
+        key: "pricesets",
+        label: "ชุดราคา",
+        path: "/price-sets",
+        icon: Tags,
+      },
       {
         key: "docs",
         label: "เอกสารการค้า",

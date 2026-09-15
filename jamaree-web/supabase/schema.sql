@@ -1948,3 +1948,138 @@ comment on column public.shop_settings.bulk_tank_kg is
   'ความจุถังเก็บแก๊สใหญ่ (กิโล) — ใช้คิด % ที่เหลือบนหน้าแดชบอร์ด · 0 = ยังไม่ได้ตั้ง';
 
 
+-- ============================================================
+-- 12. ชุดราคาแบบตาราง + รูปสินค้า (เพิ่มรอบที่ 8 — รันซ้ำได้)
+--
+-- ⭐ ไม่ได้สร้างระบบราคาใหม่ — ยกของเดิม (price_tiers + products.tier_prices)
+--    มาทำให้ใช้งานง่ายขึ้นเท่านั้น เพื่อไม่ให้มีที่เก็บราคา 2 ที่ (กฎ SSOT)
+--      • price_tiers      = "ชุดราคา" (เดิมมีอยู่แล้ว) — เพิ่มแค่คำอธิบาย
+--      • price_set_items  = ราคาต่อสินค้าในชุดนั้น — ย้ายออกจาก jsonb มาเป็นตารางจริง
+--                           (ค้นหา/รายงาน/แก้ทีละแถวได้ ไม่ต้องอ่านทั้งก้อน)
+--      • customers.price_tier_id = ชุดราคาของลูกค้า (เดิมมีอยู่แล้ว ไม่เพิ่มคอลัมน์ใหม่)
+--    products.tier_prices ยังอยู่ชั่วคราวเพื่อย้ายข้อมูล — เลิกใช้แล้ว (ดูท้ายหัวข้อ)
+-- ============================================================
+
+-- ---- 12.1 รูปสินค้า ----
+alter table public.products
+  add column if not exists image_url text;
+
+comment on column public.products.image_url is
+  'ลิงก์รูปสินค้า — ว่างได้ ถ้าไม่ใส่จะโชว์ไอคอนแทน';
+
+-- ---- 12.2 คำอธิบายชุดราคา ----
+alter table public.price_tiers
+  add column if not exists description text;
+
+comment on table public.price_tiers is
+  'ชุดราคา — ลูกค้าคนละกลุ่มได้ราคาต่างกัน (customers.price_tier_id ชี้มาที่นี่)';
+
+-- ---- 12.3 ราคาต่อสินค้าในชุดราคา ----
+create table if not exists public.price_set_items (
+  id            uuid primary key default gen_random_uuid(),
+  price_set_id  uuid not null references public.price_tiers (id) on delete cascade,
+  product_id    uuid not null references public.products (id)    on delete cascade,
+  custom_price  numeric(14, 2) not null check (custom_price >= 0),
+  created_at    timestamptz not null default now(),
+  -- สินค้า 1 ตัว มีได้ราคาเดียวต่อ 1 ชุดราคา
+  constraint price_set_items_unique unique (price_set_id, product_id)
+);
+
+create index if not exists price_set_items_set_idx
+  on public.price_set_items (price_set_id);
+create index if not exists price_set_items_product_idx
+  on public.price_set_items (product_id);
+
+comment on table public.price_set_items is
+  'ราคาเฉพาะของสินค้าในชุดราคา — ไม่มีแถว = ใช้ราคาปกติของสินค้า';
+
+-- ---- 12.4 ย้ายราคาเดิมจาก products.tier_prices (jsonb) เข้าตารางใหม่ ----
+-- รันซ้ำได้: แถวที่ย้ายแล้วจะถูกข้าม (on conflict do nothing) ไม่ทับของที่แก้ไปแล้ว
+insert into public.price_set_items (price_set_id, product_id, custom_price)
+select (tp.key)::uuid, p.id, (tp.value #>> '{}')::numeric
+  from public.products p
+ cross join lateral jsonb_each(coalesce(p.tier_prices, '{}'::jsonb)) as tp(key, value)
+ where nullif(tp.value #>> '{}', '') is not null
+   and exists (select 1 from public.price_tiers t where t.id = (tp.key)::uuid)
+on conflict on constraint price_set_items_unique do nothing;
+
+-- ---- 12.5 ราคาขายอ่านจากตารางใหม่แทน jsonb ----
+-- ยังเป็นจุดเดียวที่อ่านราคาเหมือนเดิม (เว็บ + แอป POS เรียกตัวนี้ตัวเดียว)
+create or replace function public.price_for(p_product_id uuid, p_customer_id uuid)
+returns numeric
+language sql
+stable
+set search_path = public, pg_temp
+as $$
+  select coalesce(
+           (select i.custom_price
+              from public.price_set_items i
+              join public.customers c on c.id = p_customer_id
+             where i.product_id = p.id
+               and i.price_set_id = c.price_tier_id),
+           p.price
+         )
+    from public.products p
+   where p.id = p_product_id;
+$$;
+
+-- ---- 12.6 RLS ----
+alter table public.price_set_items enable row level security;
+
+drop policy if exists "ผู้ใช้ที่ล็อกอินแล้วใช้งานได้" on public.price_set_items;
+create policy "ผู้ใช้ที่ล็อกอินแล้วใช้งานได้"
+  on public.price_set_items for all to authenticated
+  using (true) with check (true);
+
+-- ---- 12.7 เก็บกวาดทีหลัง ----
+-- products.tier_prices เลิกใช้แล้ว แต่ยังไม่ลบ เผื่อต้องย้อนข้อมูล
+-- ให้รันบรรทัดล่างนี้ "หลังจาก" ใช้ระบบใหม่ไปสักพักแล้วมั่นใจว่าราคาถูกต้องครบ
+--   alter table public.products drop column tier_prices;
+comment on column public.products.tier_prices is
+  '⚠️ เลิกใช้แล้ว — ย้ายไปตาราง price_set_items ตั้งแต่รอบที่ 8 (เก็บไว้เผื่อย้อนข้อมูลเท่านั้น)';
+
+
+-- ============================================================
+-- 13. ที่เก็บรูปสินค้า (เพิ่มรอบที่ 9 — รันซ้ำได้)
+--
+-- เจ้าของเลือกรูปจากเครื่องได้เลย ไม่ต้องไปหาลิงก์รูปจากที่อื่น
+-- products.image_url เก็บ "ลิงก์สาธารณะ" ที่ชี้มาที่ถังนี้
+-- ============================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'product-images',
+  'product-images',
+  true,                 -- อ่านได้โดยไม่ต้องล็อกอิน เพื่อให้รูปโชว์บนใบเสนอราคา/หน้าร้านได้
+  3145728,              -- 3 MB ต่อไฟล์
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+on conflict (id) do update set
+  public             = excluded.public,
+  file_size_limit    = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+-- อ่านรูปได้ทุกคน แต่ "อัปโหลด/แก้/ลบ" ต้องล็อกอินก่อนเสมอ
+drop policy if exists "ดูรูปสินค้าได้ทุกคน" on storage.objects;
+create policy "ดูรูปสินค้าได้ทุกคน"
+  on storage.objects for select
+  using (bucket_id = 'product-images');
+
+drop policy if exists "ผู้ใช้ที่ล็อกอินแล้วอัปโหลดรูปสินค้าได้" on storage.objects;
+create policy "ผู้ใช้ที่ล็อกอินแล้วอัปโหลดรูปสินค้าได้"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'product-images');
+
+drop policy if exists "ผู้ใช้ที่ล็อกอินแล้วแก้รูปสินค้าได้" on storage.objects;
+create policy "ผู้ใช้ที่ล็อกอินแล้วแก้รูปสินค้าได้"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'product-images')
+  with check (bucket_id = 'product-images');
+
+drop policy if exists "ผู้ใช้ที่ล็อกอินแล้วลบรูปสินค้าได้" on storage.objects;
+create policy "ผู้ใช้ที่ล็อกอินแล้วลบรูปสินค้าได้"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'product-images');
+
+
+

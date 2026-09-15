@@ -25,6 +25,9 @@ import type {
   OrderInput,
   PoItem,
   PriceTier,
+  PriceSetInput,
+  PriceSetItem,
+  PriceSetItemInput,
   Payroll,
   PayrollRow,
   Product,
@@ -53,6 +56,8 @@ type LoadStatus = "idle" | "loading" | "ready" | "error";
 interface AppState {
   /* ---- ข้อมูล ---- */
   priceTiers: PriceTier[];
+  /** ราคาเฉพาะของสินค้าในแต่ละชุดราคา — ไม่มีแถว = ใช้ราคาปกติ */
+  priceSetItems: PriceSetItem[];
   customers: Customer[];
   products: Product[];
   moves: InventoryMove[];
@@ -85,10 +90,21 @@ interface AppState {
   reloadTransactions: () => Promise<void>;
   reloadDocuments: () => Promise<void>;
   reloadPurchaseOrders: () => Promise<void>;
+  reloadPriceSets: () => Promise<void>;
 
   /* ---- บันทึกข้อมูล ---- */
   saveCustomer: (input: CustomerInput, id?: UUID) => Promise<Customer>;
   saveProduct: (input: ProductInput, id?: UUID) => Promise<Product>;
+  savePriceSet: (input: PriceSetInput, id?: UUID) => Promise<PriceTier>;
+  /** ลบชุดราคา — ราคาในชุดหายตามทั้งหมด ลูกค้าที่ใช้อยู่จะกลับไปใช้ราคาปกติ */
+  deletePriceSet: (id: UUID) => Promise<void>;
+  /** ตั้งราคาสินค้าในชุดราคา — สินค้าตัวเดิมในชุดเดิมจะทับของเก่าให้เอง */
+  savePriceSetItem: (
+    input: PriceSetItemInput,
+    id?: UUID,
+  ) => Promise<PriceSetItem>;
+  /** เอาสินค้าออกจากชุดราคา — กลับไปใช้ราคาปกติของสินค้า */
+  deletePriceSetItem: (id: UUID) => Promise<void>;
   saveOrder: (input: OrderInput, id?: UUID) => Promise<Order>;
   saveTransaction: (input: TransactionInput, id?: UUID) => Promise<Transaction>;
   /** ลบรายการเงิน — ได้เฉพาะรายการที่กรอกเอง (ฐานข้อมูลกันไว้อีกชั้น) */
@@ -176,6 +192,7 @@ function toMessage(err: unknown): string {
 
 export const useAppStore = create<AppState>()((set, get) => ({
   priceTiers: [],
+  priceSetItems: [],
   customers: [],
   products: [],
   moves: [],
@@ -207,6 +224,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     try {
       const [
         tiers,
+        priceSetItems,
         customers,
         products,
         moves,
@@ -228,6 +246,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         deposits,
       ] = await Promise.all([
         supabase.from("price_tiers").select("*").order("sort_order"),
+        supabase.from("price_set_items").select("*"),
         supabase.from("customers").select("*").order("name"),
         supabase.from("products").select("*").order("name"),
         supabase
@@ -294,6 +313,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
       const failed = [
         tiers,
+        priceSetItems,
         customers,
         products,
         moves,
@@ -318,6 +338,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
       set({
         priceTiers: (tiers.data ?? []) as PriceTier[],
+        priceSetItems: (priceSetItems.data ?? []) as PriceSetItem[],
         customers: (customers.data ?? []) as Customer[],
         products: (products.data ?? []) as Product[],
         moves: (moves.data ?? []) as InventoryMove[],
@@ -408,6 +429,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set({ transactions: (data ?? []) as Transaction[] });
   },
 
+  reloadPriceSets: async () => {
+    const [tiers, items] = await Promise.all([
+      supabase.from("price_tiers").select("*").order("sort_order"),
+      supabase.from("price_set_items").select("*"),
+    ]);
+    const failed = [tiers, items].find((r) => r.error);
+    if (failed?.error) {
+      set({ error: toMessage(failed.error) });
+      return;
+    }
+    set({
+      priceTiers: (tiers.data ?? []) as PriceTier[],
+      priceSetItems: (items.data ?? []) as PriceSetItem[],
+    });
+  },
+
   /* ============ บันทึกข้อมูล ============ */
 
   saveCustomer: async (input, id) => {
@@ -431,7 +468,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   saveProduct: async (input, id) => {
     // สต๊อกขยับผ่าน addMove() เท่านั้น — ตัด stock ออกจากฟอร์มเสมอ (ฐานข้อมูลก็กันไว้อีกชั้น)
-    const { stock: _ignored, ...payload } = input;
+    const { stock: _ignored, ...rest } = input;
+    const payload = {
+      ...rest,
+      ...("image_url" in rest
+        ? { image_url: (rest.image_url ?? "").trim() || null }
+        : {}),
+    };
     const query = id
       ? supabase.from("products").update(payload).eq("id", id)
       : supabase.from("products").insert(payload);
@@ -448,6 +491,81 @@ export const useAppStore = create<AppState>()((set, get) => ({
       ).sort((a, b) => a.name.localeCompare(b.name, "th")),
     }));
     return row;
+  },
+
+  savePriceSet: async (input, id) => {
+    const payload = {
+      ...input,
+      name: (input.name ?? "").trim(),
+      description: (input.description ?? "").trim() || null,
+    };
+    const query = id
+      ? supabase.from("price_tiers").update(payload).eq("id", id)
+      : supabase.from("price_tiers").insert(payload);
+    const { data, error } = await query.select().single();
+    if (error) {
+      set({ error: toMessage(error) });
+      throw error;
+    }
+    const row = data as PriceTier;
+    set((s) => ({
+      priceTiers: (id
+        ? s.priceTiers.map((t) => (t.id === id ? row : t))
+        : [...s.priceTiers, row]
+      ).sort((a, b) => a.sort_order - b.sort_order),
+    }));
+    return row;
+  },
+
+  deletePriceSet: async (id) => {
+    const { error } = await supabase.from("price_tiers").delete().eq("id", id);
+    if (error) {
+      set({ error: toMessage(error) });
+      throw error;
+    }
+    // ฐานข้อมูลลบราคาในชุดให้เอง (cascade) + ปลดชุดราคาออกจากลูกค้า (set null)
+    set((s) => ({
+      priceTiers: s.priceTiers.filter((t) => t.id !== id),
+      priceSetItems: s.priceSetItems.filter((i) => i.price_set_id !== id),
+      customers: s.customers.map((c) =>
+        c.price_tier_id === id ? { ...c, price_tier_id: null } : c,
+      ),
+    }));
+  },
+
+  savePriceSetItem: async (input, id) => {
+    const payload = { ...input, custom_price: Number(input.custom_price) || 0 };
+    const query = id
+      ? supabase.from("price_set_items").update(payload).eq("id", id)
+      : supabase
+          .from("price_set_items")
+          .upsert(payload, { onConflict: "price_set_id,product_id" });
+    const { data, error } = await query.select().single();
+    if (error) {
+      set({ error: toMessage(error) });
+      throw error;
+    }
+    const row = data as PriceSetItem;
+    set((s) => ({
+      priceSetItems: s.priceSetItems.some((i) => i.id === row.id)
+        ? s.priceSetItems.map((i) => (i.id === row.id ? row : i))
+        : [...s.priceSetItems, row],
+    }));
+    return row;
+  },
+
+  deletePriceSetItem: async (id) => {
+    const { error } = await supabase
+      .from("price_set_items")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      set({ error: toMessage(error) });
+      throw error;
+    }
+    set((s) => ({
+      priceSetItems: s.priceSetItems.filter((i) => i.id !== id),
+    }));
   },
 
   saveOrder: async (input, id) => {

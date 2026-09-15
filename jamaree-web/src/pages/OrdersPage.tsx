@@ -26,9 +26,17 @@ function newItem(): DraftItem {
 }
 
 export function OrdersPage() {
-  const { orders, products, customers, orderTotal, priceFor, customerName } =
-    useDerived();
+  const {
+    orders,
+    products,
+    customers,
+    orderTotal,
+    priceFor,
+    hasCustomPrice,
+    customerName,
+  } = useDerived();
   const saveOrder = useAppStore((s) => s.saveOrder);
+  const priceTiers = useAppStore((s) => s.priceTiers);
 
   const [filter, setFilter] = useState<Filter>("ค้างส่ง");
   const [open, setOpen] = useState(false);
@@ -58,6 +66,14 @@ export function OrdersPage() {
     );
   }, 0);
   const paid = Number(cash || 0) + Number(transfer || 0);
+
+  const priceSetId = customers.find((c) => c.id === customerId)?.price_tier_id;
+  const priceSet = priceTiers.find((t) => t.id === priceSetId);
+  const priceSetHint = priceSet
+    ? `ใช้ราคาชุด “${priceSet.name}” — ★ คือรายการที่ได้ราคาพิเศษ`
+    : customerId
+      ? "ลูกค้ารายนี้ใช้ราคาปกติของสินค้า"
+      : undefined;
   const remain = Math.max(0, draftTotal - paid);
 
   function openNew() {
@@ -243,7 +259,7 @@ export function OrdersPage() {
       >
         <div className="space-y-4">
           <div className="grid gap-3.5 sm:grid-cols-2">
-            <Field label="ลูกค้า">
+            <Field label="ลูกค้า" hint={priceSetHint}>
               {(id) => (
                 <Select
                   id={id}
@@ -316,12 +332,24 @@ export function OrdersPage() {
                     className="w-20 rounded-btn border border-line bg-card px-3 py-2 text-right text-sm focus:border-accent focus:outline-none"
                   />
                   <span className="w-24 text-right text-sm tabular-nums text-muted">
-                    {it.product_id
-                      ? fmtBaht(
+                    {it.product_id ? (
+                      <>
+                        {fmtBaht(
                           priceFor(it.product_id, customerId || null) *
                             Number(it.qty || 0),
-                        )
-                      : "—"}
+                        )}
+                        <span className="block text-xs">
+                          @
+                          {fmtBaht(priceFor(it.product_id, customerId || null))}
+                          {hasCustomPrice(
+                            it.product_id,
+                            customerId || null,
+                          ) && <span className="text-accent"> ★</span>}
+                        </span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </span>
                   <button
                     type="button"

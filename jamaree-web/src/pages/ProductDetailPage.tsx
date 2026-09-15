@@ -3,6 +3,7 @@ import { Card, Section } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ProductThumb } from "@/components/ui/ProductThumb";
 import { GAS_FILL_KINDS, fmtBaht, fmtDate, fmtQty } from "@/lib/constants";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
@@ -26,6 +27,7 @@ export function ProductDetailPage() {
   const { productById } = useDerived();
   const moves = useAppStore((s) => s.moves);
   const priceTiers = useAppStore((s) => s.priceTiers);
+  const priceSetItems = useAppStore((s) => s.priceSetItems);
 
   const product = productById(id);
 
@@ -47,8 +49,13 @@ export function ProductDetailPage() {
   const myMoves = moves.filter((m) => m.product_id === product.id);
   const usesRaw = GAS_FILL_KINDS.includes(product.kind);
   const tierRows = priceTiers
-    .map((t) => ({ tier: t, price: product.tier_prices?.[t.id] }))
-    .filter((r) => r.price != null && String(r.price) !== "");
+    .map((t) => ({
+      tier: t,
+      price: priceSetItems.find(
+        (i) => i.price_set_id === t.id && i.product_id === product.id,
+      )?.custom_price,
+    }))
+    .filter((r) => r.price != null);
 
   return (
     <div className="space-y-4">
@@ -76,31 +83,36 @@ export function ProductDetailPage() {
       />
 
       <Card className="p-4 md:p-5">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Info
-            label="ราคาขาย"
-            value={`${fmtBaht(Number(product.price))} บาท`}
-          />
-          <Info
-            label="ต้นทุน"
-            value={
-              product.cost == null ? "" : `${fmtBaht(Number(product.cost))} บาท`
-            }
-          />
-          <Info
-            label="จุดเตือน"
-            value={
-              Number(product.low_at) > 0
-                ? `${fmtQty(Number(product.low_at))} ${product.unit}`
-                : ""
-            }
-          />
-          <Info
-            label="กิโลแก๊สต่อถัง"
-            value={
-              product.fill_kg ? `${fmtQty(Number(product.fill_kg))} กก.` : ""
-            }
-          />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <ProductThumb url={product.image_url} name={product.name} size="lg" />
+          <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Info
+              label="ราคาขาย"
+              value={`${fmtBaht(Number(product.price))} บาท`}
+            />
+            <Info
+              label="ต้นทุน"
+              value={
+                product.cost == null
+                  ? ""
+                  : `${fmtBaht(Number(product.cost))} บาท`
+              }
+            />
+            <Info
+              label="จุดเตือน"
+              value={
+                Number(product.low_at) > 0
+                  ? `${fmtQty(Number(product.low_at))} ${product.unit}`
+                  : ""
+              }
+            />
+            <Info
+              label="กิโลแก๊สต่อถัง"
+              value={
+                product.fill_kg ? `${fmtQty(Number(product.fill_kg))} กก.` : ""
+              }
+            />
+          </div>
         </div>
       </Card>
 

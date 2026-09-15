@@ -255,7 +255,7 @@ export function CustomersPage() {
                 <option value="">ราคาปกติ</option>
                 {priceTiers.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}
+                    {t.description ? `${t.name} — ${t.description}` : t.name}
                   </option>
                 ))}
               </Select>

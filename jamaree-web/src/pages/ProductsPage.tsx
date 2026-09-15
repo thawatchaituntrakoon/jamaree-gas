@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowDownToLine,
@@ -6,6 +7,8 @@ import {
   Pencil,
   Plus,
   Search,
+  Upload,
+  X,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -14,6 +17,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ProductThumb } from "@/components/ui/ProductThumb";
 import {
   GAS_FILL_KINDS,
   PRODUCT_KINDS,
@@ -21,6 +25,7 @@ import {
   fmtQty,
 } from "@/lib/constants";
 import { useDerived } from "@/lib/useDerived";
+import { uploadProductImage } from "@/lib/uploadProductImage";
 import { useAppStore } from "@/store/useAppStore";
 import type { MoveType, Product, ProductInput, ProductKind } from "@/types";
 
@@ -35,6 +40,7 @@ const BLANK: ProductInput = {
   price: 0,
   cost: null,
   active: true,
+  image_url: "",
 };
 
 /** สินค้าที่ไม่มีสต๊อกของตัวเอง — ตัดจากถังเก็บใหญ่ตอนขายแทน */
@@ -61,6 +67,10 @@ export function ProductsPage() {
 
   const [busy, setBusy] = useState(false);
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [imgError, setImgError] = useState("");
+
   const lowIds = useMemo(() => new Set(lowStock.map((p) => p.id)), [lowStock]);
 
   const rows = useMemo(() => {
@@ -79,6 +89,7 @@ export function ProductsPage() {
   function openNew() {
     setEditing(null);
     setForm(BLANK);
+    resetImagePicker();
     setFormOpen(true);
   }
 
@@ -95,8 +106,41 @@ export function ProductsPage() {
       price: p.price,
       cost: p.cost,
       active: p.active,
+      image_url: p.image_url ?? "",
     });
+    resetImagePicker();
     setFormOpen(true);
+  }
+
+  function resetImagePicker() {
+    setImgError("");
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function pickImage(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImgError("");
+    setUploading(true);
+    try {
+      const url = await uploadProductImage(file);
+      setForm((f) => ({ ...f, image_url: url }));
+    } catch (err) {
+      setImgError(
+        err instanceof Error
+          ? err.message
+          : "อัปโหลดรูปไม่สำเร็จ ลองใหม่อีกครั้ง",
+      );
+    } finally {
+      setUploading(false);
+      // เคลียร์ช่องไฟล์ เผื่อเลือกรูปเดิมซ้ำอีกครั้ง
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  function clearImage() {
+    setForm((f) => ({ ...f, image_url: "" }));
+    resetImagePicker();
   }
 
   async function submitForm() {
@@ -206,18 +250,21 @@ export function ProductsPage() {
             {
               header: "สินค้า",
               cell: (p) => (
-                <div>
-                  <Link
-                    to={`/products/${p.id}`}
-                    className="font-medium text-ink hover:text-accent hover:underline"
-                  >
-                    {p.name}
-                  </Link>
-                  <p className="text-xs text-muted">
-                    {[p.kind || "สินค้าทั่วไป", p.size]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <ProductThumb url={p.image_url} name={p.name} />
+                  <div className="min-w-0">
+                    <Link
+                      to={`/products/${p.id}`}
+                      className="font-medium text-ink hover:text-accent hover:underline"
+                    >
+                      {p.name}
+                    </Link>
+                    <p className="text-xs text-muted">
+                      {[p.kind || "สินค้าทั่วไป", p.size]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
                 </div>
               ),
             },
@@ -302,7 +349,10 @@ export function ProductsPage() {
             <Button variant="secondary" onClick={() => setFormOpen(false)}>
               ยกเลิก
             </Button>
-            <Button onClick={submitForm} disabled={busy || !form.name?.trim()}>
+            <Button
+              onClick={submitForm}
+              disabled={busy || uploading || !form.name?.trim()}
+            >
               {busy ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </>
@@ -317,6 +367,50 @@ export function ProductsPage() {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="เช่น แก๊สหุงต้ม 15 กก."
               />
+            )}
+          </Field>
+
+          <Field
+            label="รูปสินค้า"
+            hint="เลือกรูปจากเครื่อง ไฟล์ JPG PNG WEBP หรือ GIF ไม่เกิน 3 MB — ไม่ใส่ก็ได้"
+          >
+            {(id) => (
+              <div className="flex items-start gap-3">
+                <ProductThumb
+                  url={form.image_url}
+                  name={form.name ?? ""}
+                  size="md"
+                />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <input
+                    id={id}
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    disabled={uploading}
+                    onChange={pickImage}
+                    className="w-full text-sm text-muted file:mr-3 file:rounded-btn file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-accent hover:file:bg-accent-soft/70"
+                  />
+                  {uploading && (
+                    <p className="flex items-center gap-1.5 text-xs text-muted">
+                      <Upload size={12} /> กำลังอัปโหลด…
+                    </p>
+                  )}
+                  {imgError && (
+                    <p className="text-xs text-danger">{imgError}</p>
+                  )}
+                  {!!form.image_url && !uploading && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<X size={14} />}
+                      onClick={clearImage}
+                    >
+                      เอารูปออก
+                    </Button>
+                  )}
+                </div>
+              </div>
             )}
           </Field>
 
