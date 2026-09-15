@@ -1,8 +1,12 @@
-version: '3.8'
 services:
   jamaree-frontend:
     container_name: jamaree-frontend
-    build: .
+    build:
+      context: .
+      args:
+        # อ่านจากไฟล์ .env ที่วางไว้ข้าง ๆ docker-compose.yml บนเซิร์ฟเวอร์
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     ports:
       - "80:80"
     restart: unless-stopped

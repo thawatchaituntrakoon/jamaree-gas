@@ -18,6 +18,7 @@ import {
   todayStr,
 } from "@/lib/constants";
 import { docTypeTone } from "@/lib/docMath";
+import { uid } from "@/lib/uid";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
 import type { DocType, ShopSettingsInput, TradeDocument, UUID } from "@/types";
@@ -30,7 +31,7 @@ interface DraftItem {
 }
 
 const newItem = (): DraftItem => ({
-  key: crypto.randomUUID(),
+  key: uid(),
   name: "",
   qty: "1",
   price: "",
@@ -118,7 +119,7 @@ export function DocsPage() {
     setItems(
       d.items.length
         ? d.items.map((it) => ({
-            key: crypto.randomUUID(),
+            key: uid(),
             name: it.name,
             qty: String(it.qty),
             price: String(it.price),

@@ -9,6 +9,7 @@ import { Field, Select, TextInput } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { fmtBaht, fmtDate, todayStr, workStageTone } from "@/lib/constants";
+import { uid } from "@/lib/uid";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
 import type { Order, OrderItemInput, UUID } from "@/types";
@@ -21,7 +22,7 @@ interface DraftItem extends OrderItemInput {
 }
 
 function newItem(): DraftItem {
-  return { key: crypto.randomUUID(), product_id: "", qty: 1 };
+  return { key: uid(), product_id: "", qty: 1 };
 }
 
 export function OrdersPage() {

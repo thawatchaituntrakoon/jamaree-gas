@@ -8,6 +8,7 @@ import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { fmtBaht, fmtDate, poStatusTone, todayStr } from "@/lib/constants";
+import { uid } from "@/lib/uid";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
 import type { PoItem, PurchaseOrder, UUID, Vendor, VendorInput } from "@/types";
@@ -23,7 +24,7 @@ interface DraftItem {
 }
 
 const newItem = (): DraftItem => ({
-  key: crypto.randomUUID(),
+  key: uid(),
   product_id: "",
   name: "",
   qty: "1",
@@ -80,7 +81,7 @@ export function PurchasesPage() {
 
   function toDraft(list: PoItem[]): DraftItem[] {
     return list.map((it) => ({
-      key: crypto.randomUUID(),
+      key: uid(),
       product_id: it.product_id ?? "",
       name: it.name,
       qty: String(it.qty),
