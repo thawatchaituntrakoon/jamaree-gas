@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Sidebar } from "./Sidebar";
+import { SimulationBanner } from "./SimulationBanner";
 import { Topbar } from "./Topbar";
 import { navItemByPath } from "@/lib/nav";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -30,6 +31,7 @@ export function DashboardLayout() {
 
       <div className="lg:pl-64">
         <Topbar title={title} onOpenMenu={() => setMenuOpen(true)} />
+        <SimulationBanner />
 
         <main className="mx-auto max-w-7xl px-4 py-5 md:px-6 md:py-6">
           {!isSupabaseConfigured && (

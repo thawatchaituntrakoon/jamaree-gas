@@ -301,16 +301,26 @@ export type AccessRole =
   | "FILLER"
   | "GENERAL";
 
+/** บัญชีเข้าระบบ — แยกจากทะเบียนพนักงาน คนที่ไม่มีบัญชีก็มีชื่อในทะเบียนได้ */
+export interface UserProfile {
+  id: UUID;
+  email: string | null;
+  role: AccessRole;
+  staff_id: UUID | null;
+  created_at: ISODateTime;
+}
+
+/** โปรไฟล์ + ชื่อพนักงานที่ผูกไว้ */
+export interface UserProfileRow extends UserProfile {
+  staff: { id: UUID; name: string; nickname: string | null } | null;
+}
+
 export interface Staff {
   id: UUID;
   name: string;
   nickname: string | null;
-  /** ตำแหน่งงานที่พิมพ์เอง — ไม่เกี่ยวกับสิทธิ์ */
+  /** ตำแหน่งงานที่พิมพ์เอง — สิทธิ์เข้าระบบอยู่ที่ user_profiles */
   role: string | null;
-  /** สิทธิ์เข้าใช้ระบบ */
-  access_role: AccessRole;
-  /** บัญชีเข้าสู่ระบบของคนนี้ — ว่าง = ยังไม่ได้เปิดบัญชีให้ */
-  user_id: UUID | null;
   phone: string | null;
   pay_type: PayType;
   salary: number;

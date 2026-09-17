@@ -2150,5 +2150,190 @@ grant execute on function public.my_role()        to authenticated;
 grant execute on function public.has_role(text[]) to authenticated;
 
 
+-- ============================================================
+-- 14. แยก "บัญชีเข้าระบบ" ออกจาก "ทะเบียนพนักงาน" (เพิ่มรอบที่ 10 — รันซ้ำได้)
+--
+-- staff      = ข้อมูลบุคคล/ค่าจ้าง (คนที่ไม่มีบัญชีก็มีชื่อได้)
+-- user_profiles = บัญชีล็อกอิน + สิทธิ์ (คนนอกที่ไม่ใช่พนักงานก็มีบัญชีได้)
+-- ============================================================
+
+create table if not exists public.user_profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  email text,
+  role text not null default 'GENERAL',
+  staff_id uuid references public.staff (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+comment on table public.user_profiles is
+  'บัญชีเข้าระบบ 1 แถวต่อ 1 auth.users — staff_id ว่างได้ (บัญชีที่ไม่ผูกกับพนักงานคนไหน)';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'user_profiles_role_chk') then
+    alter table public.user_profiles add constraint user_profiles_role_chk
+      check (role in (
+        'SUPER_ADMIN', 'MANAGER', 'FINANCE', 'SALES', 'DELIVERY', 'FILLER', 'GENERAL'
+      ));
+  end if;
+end;
+$$;
+
+-- พนักงาน 1 คนผูกได้บัญชีเดียว
+create unique index if not exists user_profiles_staff_uidx
+  on public.user_profiles (staff_id) where staff_id is not null;
+
+/* ---------- ย้ายของเดิมจาก staff มาใส่ (รันซ้ำได้ ไม่ทับของใหม่) ---------- */
+
+insert into public.user_profiles (id, email, role, staff_id)
+select s.user_id, u.email, s.access_role, s.id
+  from public.staff s
+  join auth.users u on u.id = s.user_id
+ where s.user_id is not null
+on conflict (id) do nothing;
+
+-- บัญชีที่ล็อกอินได้แต่ยังไม่มีโปรไฟล์ — ให้สิทธิ์น้อยสุดไว้ก่อน
+insert into public.user_profiles (id, email)
+select u.id, u.email
+  from auth.users u
+ where not exists (select 1 from public.user_profiles p where p.id = u.id)
+on conflict (id) do nothing;
+
+/* ---------- สมัครบัญชีใหม่แล้วได้โปรไฟล์อัตโนมัติ ---------- */
+
+-- ⚠️ ไม่อ่าน role จาก metadata ของคนสมัคร — ไม่งั้นสมัครเองแล้วตั้งตัวเองเป็นผู้ดูแลได้เลย
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into public.user_profiles (id, email)
+  values (new.id, new.email)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+create or replace function public.handle_user_email_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.user_profiles set email = new.email where id = new.id;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_email_changed on auth.users;
+create trigger on_auth_user_email_changed
+  after update of email on auth.users
+  for each row execute function public.handle_user_email_change();
+
+/* ---------- กันล็อกตัวเองออกจากระบบถาวร ---------- */
+
+create or replace function public.guard_last_super_admin()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if (tg_op = 'DELETE' and old.role = 'SUPER_ADMIN')
+     or (tg_op = 'UPDATE' and old.role = 'SUPER_ADMIN' and new.role <> 'SUPER_ADMIN')
+  then
+    if (select count(*) from public.user_profiles where role = 'SUPER_ADMIN') <= 1 then
+      raise exception 'ต้องเหลือผู้ดูแลระบบสูงสุดอย่างน้อย 1 คนเสมอ';
+    end if;
+  end if;
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists guard_last_super_admin_trg on public.user_profiles;
+create trigger guard_last_super_admin_trg
+  before update or delete on public.user_profiles
+  for each row execute function public.guard_last_super_admin();
+
+/* ---------- สิทธิ์อ่าน/เขียนตาราง user_profiles ---------- */
+
+alter table public.user_profiles enable row level security;
+
+drop policy if exists "ดูบัญชีของตัวเองได้" on public.user_profiles;
+create policy "ดูบัญชีของตัวเองได้"
+  on public.user_profiles for select to authenticated
+  using (id = auth.uid());
+
+drop policy if exists "ผู้บริหารดูบัญชีทั้งหมดได้" on public.user_profiles;
+create policy "ผู้บริหารดูบัญชีทั้งหมดได้"
+  on public.user_profiles for select to authenticated
+  using (public.has_role(array['SUPER_ADMIN', 'MANAGER']));
+
+drop policy if exists "ผู้บริหารเพิ่มบัญชีได้" on public.user_profiles;
+create policy "ผู้บริหารเพิ่มบัญชีได้"
+  on public.user_profiles for insert to authenticated
+  with check (
+    public.has_role(array['SUPER_ADMIN', 'MANAGER'])
+    and (role <> 'SUPER_ADMIN' or public.my_role() = 'SUPER_ADMIN')
+  );
+
+-- แก้บัญชีตัวเองได้ แต่ห้ามเลื่อนสิทธิ์ตัวเอง · ผู้จัดการแตะบัญชีผู้ดูแลสูงสุดไม่ได้
+drop policy if exists "ผู้บริหารแก้บัญชีได้" on public.user_profiles;
+create policy "ผู้บริหารแก้บัญชีได้"
+  on public.user_profiles for update to authenticated
+  using (
+    public.has_role(array['SUPER_ADMIN', 'MANAGER'])
+    and (role <> 'SUPER_ADMIN' or public.my_role() = 'SUPER_ADMIN')
+  )
+  with check (
+    public.has_role(array['SUPER_ADMIN', 'MANAGER'])
+    and (role <> 'SUPER_ADMIN' or public.my_role() = 'SUPER_ADMIN')
+    and (id <> auth.uid() or role = public.my_role())
+  );
+
+drop policy if exists "ผู้บริหารลบบัญชีได้" on public.user_profiles;
+create policy "ผู้บริหารลบบัญชีได้"
+  on public.user_profiles for delete to authenticated
+  using (
+    public.has_role(array['SUPER_ADMIN', 'MANAGER'])
+    and id <> auth.uid()
+    and (role <> 'SUPER_ADMIN' or public.my_role() = 'SUPER_ADMIN')
+  );
+
+/* ---------- สิทธิ์อ่านจากที่ใหม่แทน staff ---------- */
+
+create or replace function public.my_role()
+returns text
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select coalesce(
+    (select role from public.user_profiles where id = auth.uid() limit 1),
+    'GENERAL'
+  );
+$$;
+
+revoke all on function public.my_role() from public, anon;
+grant execute on function public.my_role() to authenticated;
+
+/* ---------- ⚠️ ล้างของเก่า — รันหลังแอปเลิกใช้ staff.access_role แล้วเท่านั้น ----------
+
+alter table public.staff drop column if exists access_role;
+alter table public.staff drop column if exists user_id;
+
+------------------------------------------------------------------------------- */
+
+
+
 
 

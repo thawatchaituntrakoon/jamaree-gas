@@ -5,7 +5,9 @@ import { useAuthStore } from "@/store/useAuthStore";
 
 /** เปิดหน้านี้ไม่ได้ — บอกให้ชัดว่าทำไม จะได้ไม่ต้องเดา */
 export function AccessDeniedPage() {
-  const role = useAuthStore((s) => s.role);
+  const role = useAuthStore((s) => s.simulatedRole ?? s.role);
+  const simulatedRole = useAuthStore((s) => s.simulatedRole);
+  const setSimulatedRole = useAuthStore((s) => s.setSimulatedRole);
   const unlinked = useAuthStore((s) => s.unlinked);
 
   return (
@@ -26,18 +28,38 @@ export function AccessDeniedPage() {
         <>
           <h2 className="mt-4 text-lg">ไม่มีสิทธิ์เข้าหน้านี้</h2>
           <p className="mt-1.5 text-muted">
-            สิทธิ์ของคุณคือ “{accessRoleLabel(role)}” — ถ้าต้องใช้หน้านี้จริง
-            ให้ผู้จัดการปรับสิทธิ์ให้
+            {simulatedRole ? (
+              <>
+                กำลังดูในมุมของ “{accessRoleLabel(role)}” —
+                สิทธิ์นี้เข้าหน้านี้ไม่ได้
+              </>
+            ) : (
+              <>
+                สิทธิ์ของคุณคือ “{accessRoleLabel(role)}” —
+                ถ้าต้องใช้หน้านี้จริง ให้ผู้จัดการปรับสิทธิ์ให้
+              </>
+            )}
           </p>
         </>
       )}
 
-      <Link
-        to="/"
-        className="mt-5 inline-block rounded-btn bg-accent px-4 py-2 font-medium text-on-accent hover:opacity-90"
-      >
-        กลับหน้าแรก
-      </Link>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {simulatedRole && (
+          <button
+            type="button"
+            onClick={() => setSimulatedRole(null)}
+            className="rounded-btn bg-warn px-4 py-2 font-medium text-on-accent hover:opacity-90"
+          >
+            เลิกสวมบทบาท
+          </button>
+        )}
+        <Link
+          to="/"
+          className="rounded-btn bg-accent px-4 py-2 font-medium text-on-accent hover:opacity-90"
+        >
+          กลับหน้าแรก
+        </Link>
+      </div>
     </div>
   );
 }

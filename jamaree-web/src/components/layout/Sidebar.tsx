@@ -5,7 +5,7 @@ import { accessRoleLabel } from "@/lib/constants";
 import { NAV_GROUPS } from "@/lib/nav";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { useAuthStore } from "@/store/useAuthStore";
+import { roleAllowed, useAuthStore } from "@/store/useAuthStore";
 
 interface SidebarProps {
   /** เปิดอยู่ไหมบนจอมือถือ */
@@ -17,8 +17,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const session = useAuthStore((s) => s.session);
   const profile = useAuthStore((s) => s.profile);
-  const role = useAuthStore((s) => s.role);
-  const can = useAuthStore((s) => s.can);
+  // ต้องเป็นสิทธิ์ที่มองอยู่ ไม่งั้นเมนูจะไม่ขยับตอนสลับมุมมอง
+  const role = useAuthStore((s) => s.simulatedRole ?? s.role);
   const signOut = useAuthStore((s) => s.signOut);
   // บนมือถือตอนเมนูปิด เมนูยังลอยอยู่นอกจอ — ปิดไม่ให้กด Tab ไปโดนได้
   const hidden = !isDesktop && !open;
@@ -26,7 +26,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   // เหลือเฉพาะเมนูที่เปิดได้จริง หมวดไหนไม่เหลืออะไรก็ไม่ต้องโชว์หัวข้อ
   const groups = NAV_GROUPS.map((g) => ({
     ...g,
-    items: g.items.filter((i) => can(i.roles)),
+    items: g.items.filter((i) => roleAllowed(role, i.roles)),
   })).filter((g) => g.items.length > 0);
 
   return (
@@ -111,7 +111,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           <div className="border-t border-line px-3 py-3">
             <div className="mb-1.5 px-2.5">
               <p className="truncate text-sm text-ink">
-                {profile?.name ?? session.user.email}
+                {profile?.staff?.name ?? session.user.email}
               </p>
               <p className="truncate text-xs text-muted">
                 {accessRoleLabel(role)}

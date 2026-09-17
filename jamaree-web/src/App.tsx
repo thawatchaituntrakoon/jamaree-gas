@@ -72,6 +72,11 @@ const BoardPage = lazy(() =>
 const ReportsPage = lazy(() =>
   import("@/pages/ReportsPage").then((m) => ({ default: m.ReportsPage })),
 );
+const UserManagementPage = lazy(() =>
+  import("@/pages/UserManagementPage").then((m) => ({
+    default: m.UserManagementPage,
+  })),
+);
 const PosPage = lazy(() =>
   import("@/pages/PosPage").then((m) => ({ default: m.PosPage })),
 );
@@ -91,6 +96,7 @@ const READY_PAGES: Record<string, ComponentType> = {
   "/tanks": CylindersPage,
   "/board": BoardPage,
   "/reports": ReportsPage,
+  "/users": UserManagementPage,
 };
 
 export default function App() {

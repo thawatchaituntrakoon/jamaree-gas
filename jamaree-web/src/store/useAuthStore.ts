@@ -1,33 +1,40 @@
 import { create } from "zustand";
 import type { Session } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import type { AccessRole, Staff } from "@/types";
+import type { AccessRole, UserProfileRow } from "@/types";
 
 /**
  * ใครกำลังใช้งานอยู่ + เปิดอะไรได้บ้าง
- * บัญชีล็อกอิน (auth.users) ผูกกับแถวพนักงานผ่าน staff.user_id — สิทธิ์อ่านจาก staff.access_role
+ * บัญชีล็อกอิน (auth.users) → user_profiles → ผูกกับทะเบียนพนักงานผ่าน staff_id (จะว่างก็ได้)
  */
 interface AuthState {
   session: Session | null;
-  /** แถวพนักงานของคนที่ล็อกอินอยู่ — null = ยังไม่ได้ผูกบัญชีไว้กับพนักงานคนไหน */
-  profile: Staff | null;
+  /** บัญชีของคนที่ล็อกอินอยู่ */
+  profile: UserProfileRow | null;
+  /** สิทธิ์จริงของบัญชีนี้ — ไม่เปลี่ยนตอนสวมบทดู */
   role: AccessRole;
+  /** กำลังสวมบทเป็นสิทธิ์ไหนอยู่ (เฉพาะผู้ดูแลระบบสูงสุด) */
+  simulatedRole: AccessRole | null;
   /** เช็คว่าล็อกอินอยู่ไหมเสร็จแล้ว */
   ready: boolean;
   /** รู้สิทธิ์แล้ว — ก่อนหน้านี้ห้ามตัดสินว่าใครเข้าหน้าไหนได้ */
   roleReady: boolean;
-  /** ล็อกอินผ่าน แต่ไม่มีแถวพนักงานผูกไว้ (หรือถูกบันทึกว่าพ้นสภาพแล้ว) */
+  /** ล็อกอินผ่าน แต่ไม่มีแถวบัญชีในระบบ */
   unlinked: boolean;
   error: string | null;
   init: () => () => void;
   loadProfile: () => Promise<void>;
   signOut: () => Promise<void>;
+  setSimulatedRole: (role: AccessRole | null) => void;
+  /** สิทธิ์ที่หน้าจอใช้ตัดสินจริง */
+  effectiveRole: () => AccessRole;
   can: (roles?: readonly AccessRole[]) => boolean;
 }
 
 const GUEST = {
   profile: null,
   role: "GENERAL" as AccessRole,
+  simulatedRole: null,
   roleReady: false,
   unlinked: false,
   error: null,
@@ -35,6 +42,17 @@ const GUEST = {
 
 // กันสมัครฟังซ้ำตอน React เรียก effect สองรอบใน StrictMode
 let subscribed = false;
+
+/** เช็คสิทธิ์แบบไม่ผ่าน store — คอมโพเนนต์ที่ subscribe สิทธิ์ไว้เองให้ใช้ตัวนี้ จะได้วาดใหม่ตอนสลับมุมมอง */
+export function roleAllowed(
+  role: AccessRole,
+  roles?: readonly AccessRole[],
+): boolean {
+  // เปิดไฟล์ใช้เองแบบไม่ต่อฐานข้อมูล — ไม่มีบัญชี ก็ไม่มีอะไรให้กั้น
+  if (!isSupabaseConfigured) return true;
+  if (!roles || roles.length === 0) return true;
+  return roles.includes(role);
+}
 
 export const useAuthStore = create<AuthState>()((set, get) => ({
   session: null,
@@ -78,10 +96,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!user) return;
 
     const { data, error } = await supabase
-      .from("staff")
-      .select("*")
-      .eq("user_id", user.id)
-      .is("terminated_at", null)
+      .from("user_profiles")
+      .select("*, staff:staff_id(id, name, nickname)")
+      .eq("id", user.id)
       .maybeSingle();
 
     if (error) {
@@ -94,10 +111,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return;
     }
 
-    const profile = (data as Staff | null) ?? null;
+    const profile = (data as UserProfileRow | null) ?? null;
     set({
       profile,
-      role: profile?.access_role ?? "GENERAL",
+      role: profile?.role ?? "GENERAL",
+      simulatedRole: null,
       roleReady: true,
       unlinked: !profile,
       error: null,
@@ -109,10 +127,17 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     await supabase.auth.signOut();
   },
 
+  setSimulatedRole(role) {
+    // คนที่ไม่ใช่ผู้ดูแลระบบสูงสุดสวมบทไม่ได้ — ไม่งั้นสวมเป็นสิทธิ์ที่สูงขึ้นก็ได้
+    if (get().role !== "SUPER_ADMIN") return;
+    set({ simulatedRole: role === get().role ? null : role });
+  },
+
+  effectiveRole() {
+    return get().simulatedRole ?? get().role;
+  },
+
   can(roles) {
-    // เปิดไฟล์ใช้เองแบบไม่ต่อฐานข้อมูล — ไม่มีบัญชี ก็ไม่มีอะไรให้กั้น
-    if (!isSupabaseConfigured) return true;
-    if (!roles || roles.length === 0) return true;
-    return roles.includes(get().role);
+    return roleAllowed(get().effectiveRole(), roles);
   },
 }));
