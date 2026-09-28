@@ -35,6 +35,9 @@ export type ProductKind =
 
 export type MoveType = "รับเข้า" | "เบิกออก" | "ปรับเพิ่ม" | "ปรับลด";
 
+/** ปลายทางของถังชำรุดที่เบิกออก — ส่งซ่อมได้กลับมา ตัดจำหน่ายคือหายถาวร */
+export type MoveReason = "ส่งซ่อม" | "ทำลาย/ตัดจำหน่าย";
+
 /** สถานะจริงของออเดอร์ — ตัวคุมการตัดสต๊อก */
 export type OrderStatus = "ใหม่" | "เสร็จ" | "ยกเลิก";
 
@@ -125,6 +128,7 @@ export interface InventoryMove {
   note: string;
   ref_type: RefType | null;
   ref_id: UUID | null;
+  reason: MoveReason | null;
   created_at: ISODateTime;
 }
 
@@ -493,4 +497,5 @@ export type MoveInput = {
   note?: string;
   ref_type?: RefType | null;
   ref_id?: UUID | null;
+  reason?: MoveReason | null;
 };

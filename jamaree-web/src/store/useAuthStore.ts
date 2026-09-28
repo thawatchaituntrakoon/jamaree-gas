@@ -43,6 +43,11 @@ const GUEST = {
 // กันสมัครฟังซ้ำตอน React เรียก effect สองรอบใน StrictMode
 let subscribed = false;
 
+// โปรไฟล์ของใครที่โหลดไปแล้ว (หรือกำลังโหลด) — ตอนเปิดแอปมีทั้ง getSession, INITIAL_SESSION
+// และ SIGNED_IN ยิงเข้ามาไล่กัน ถ้าไม่จำไว้จะยิงถาม user_profiles ซ้ำ 3 รอบ
+let profileFor: string | null = null;
+let profileLoading: Promise<void> | null = null;
+
 /** เช็คสิทธิ์แบบไม่ผ่าน store — คอมโพเนนต์ที่ subscribe สิทธิ์ไว้เองให้ใช้ตัวนี้ จะได้วาดใหม่ตอนสลับมุมมอง */
 export function roleAllowed(
   role: AccessRole,
@@ -70,11 +75,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       else set({ ...GUEST, roleReady: true });
     });
 
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+    supabase.auth.onAuthStateChange((_event, next) => {
       const prev = get().session;
       set({ session: next, ready: true });
 
       if (!next) {
+        profileFor = null;
         set({ ...GUEST, roleReady: true });
         return;
       }
@@ -85,44 +91,53 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       setTimeout(() => void get().loadProfile(), 0);
     });
 
-    return () => {
-      data.subscription.unsubscribe();
-      subscribed = false;
-    };
+    // ตัวฟังนี้อยู่ยาวเท่าอายุแอป — ถ้าเลิกฟังตอน StrictMode ถอด effect แล้วสมัครใหม่
+    // จะกลายเป็นยิงถามสิทธิ์ซ้ำอีกชุด
+    return () => {};
   },
 
   async loadProfile() {
     const user = get().session?.user;
     if (!user) return;
+    if (profileFor === user.id) return profileLoading ?? undefined;
 
-    const { data, error } = await supabase
-      .from("user_profiles")
-      .select("*, staff:staff_id(id, name, nickname)")
-      .eq("id", user.id)
-      .maybeSingle();
+    profileFor = user.id;
+    profileLoading = (async () => {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("*, staff:staff_id(id, name, nickname)")
+        .eq("id", user.id)
+        .maybeSingle();
 
-    if (error) {
-      // อ่านสิทธิ์ไม่ได้ = ให้สิทธิ์น้อยสุดไว้ก่อน ไม่ใช่ปล่อยผ่าน
+      if (error) {
+        // อ่านสิทธิ์ไม่ได้ = ให้สิทธิ์น้อยสุดไว้ก่อน ไม่ใช่ปล่อยผ่าน (เปิดทางให้ลองใหม่ได้)
+        profileFor = null;
+        set({
+          ...GUEST,
+          roleReady: true,
+          error: "อ่านสิทธิ์การใช้งานไม่สำเร็จ ลองเข้าสู่ระบบใหม่อีกครั้ง",
+        });
+        return;
+      }
+
+      const profile = (data as UserProfileRow | null) ?? null;
       set({
-        ...GUEST,
+        profile,
+        role: profile?.role ?? "GENERAL",
+        simulatedRole: null,
         roleReady: true,
-        error: "อ่านสิทธิ์การใช้งานไม่สำเร็จ ลองเข้าสู่ระบบใหม่อีกครั้ง",
+        unlinked: !profile,
+        error: null,
       });
-      return;
-    }
-
-    const profile = (data as UserProfileRow | null) ?? null;
-    set({
-      profile,
-      role: profile?.role ?? "GENERAL",
-      simulatedRole: null,
-      roleReady: true,
-      unlinked: !profile,
-      error: null,
+    })().finally(() => {
+      profileLoading = null;
     });
+
+    return profileLoading;
   },
 
   async signOut() {
+    profileFor = null;
     set({ ...GUEST, roleReady: true });
     await supabase.auth.signOut();
   },

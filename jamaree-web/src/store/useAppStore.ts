@@ -1150,7 +1150,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
     return row;
   },
 
-  addMove: async ({ product_id, type, qty, note, ref_type, ref_id }) => {
+  addMove: async ({
+    product_id,
+    type,
+    qty,
+    note,
+    ref_type,
+    ref_id,
+    reason,
+  }) => {
     const { data, error } = await supabase.rpc("add_move", {
       p_product_id: product_id,
       p_type: type,
@@ -1158,6 +1166,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       p_note: note ?? "",
       p_ref_type: ref_type ?? null,
       p_ref_id: ref_id ?? null,
+      p_reason: reason ?? null,
     });
     if (error) {
       set({ error: toMessage(error) });

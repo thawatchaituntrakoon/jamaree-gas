@@ -1,10 +1,10 @@
 import { Link, useParams } from "react-router-dom";
-import { Cylinder } from "lucide-react";
+import { CustomerCylinderManager } from "@/components/customers/CustomerCylinderManager";
 import { Card, Section } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { DataTable } from "@/components/ui/DataTable";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { fmtBaht, fmtDate, fmtQty, workStageTone } from "@/lib/constants";
+import { fmtBaht, fmtDate, workStageTone } from "@/lib/constants";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
 import type { Order } from "@/types";
@@ -20,8 +20,7 @@ function Info({ label, value }: { label: string; value: string }) {
 
 export function CustomerDetailPage() {
   const { id = "" } = useParams();
-  const { customerById, orders, orderTotal, customerDebt, custodyBalance } =
-    useDerived();
+  const { customerById, orders, orderTotal, customerDebt } = useDerived();
   const priceTiers = useAppStore((s) => s.priceTiers);
 
   const customer = customerById(id);
@@ -43,7 +42,6 @@ export function CustomerDetailPage() {
 
   const myOrders = orders.filter((o) => o.customer_id === customer.id);
   const debt = customerDebt(customer.id);
-  const cylinders = custodyBalance(customer.id);
   const tierName =
     priceTiers.find((t) => t.id === customer.price_tier_id)?.name ?? "ราคาปกติ";
 
@@ -85,46 +83,7 @@ export function CustomerDetailPage() {
         </div>
       </Card>
 
-      <Section
-        title="ถังที่อยู่กับลูกค้า"
-        hint="นับจากประวัติยืม/คืน และฝาก/ถอนฝาก"
-      >
-        {cylinders.length ? (
-          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-            {cylinders.map((c) => (
-              <div
-                key={c.size}
-                className="rounded-card border border-line p-3.5"
-              >
-                <div className="flex items-center gap-2">
-                  <Cylinder size={16} className="text-accent2" />
-                  <p className="font-medium text-ink">{c.size}</p>
-                </div>
-                <div className="mt-2 space-y-1 text-sm">
-                  <p className="flex justify-between">
-                    <span className="text-muted">ยืมไป</span>
-                    <span
-                      className={
-                        c.borrowed > 0 ? "font-medium text-warn" : "text-muted"
-                      }
-                    >
-                      {fmtQty(c.borrowed)} ถัง
-                    </span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="text-muted">ฝากไว้</span>
-                    <span className="text-ink">{fmtQty(c.deposited)} ถัง</span>
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="px-4 py-10 text-center text-sm text-muted">
-            ไม่มีถังค้างอยู่กับลูกค้ารายนี้
-          </p>
-        )}
-      </Section>
+      <CustomerCylinderManager customerId={customer.id} />
 
       <Section title="ประวัติการซื้อ" hint={`ทั้งหมด ${myOrders.length} บิล`}>
         <DataTable<Order>

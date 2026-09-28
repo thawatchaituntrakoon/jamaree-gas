@@ -24,7 +24,7 @@ function Info({ label, value }: { label: string; value: string }) {
 
 export function ProductDetailPage() {
   const { id = "" } = useParams();
-  const { productById } = useDerived();
+  const { productById, fillableForSize } = useDerived();
   const moves = useAppStore((s) => s.moves);
   const priceTiers = useAppStore((s) => s.priceTiers);
   const priceSetItems = useAppStore((s) => s.priceSetItems);
@@ -48,6 +48,9 @@ export function ProductDetailPage() {
 
   const myMoves = moves.filter((m) => m.product_id === product.id);
   const usesRaw = GAS_FILL_KINDS.includes(product.kind);
+  const fillable = usesRaw
+    ? fillableForSize(product.size, product.fill_kg)
+    : null;
   const tierRows = priceTiers
     .map((t) => ({
       tier: t,
@@ -68,7 +71,12 @@ export function ProductDetailPage() {
         backLabel="กลับหน้าสินค้า"
         action={
           usesRaw ? (
-            <Badge tone="info">ขายแล้วตัดจากถังเก็บใหญ่</Badge>
+            <div className="rounded-card bg-paper px-4 py-2 text-right">
+              <p className="text-xs text-muted">บรรจุได้จากแก๊สที่เหลือ</p>
+              <p className="font-head text-lg font-semibold text-ink">
+                {fillable == null ? "—" : `${fmtQty(fillable)} ใบ`}
+              </p>
+            </div>
           ) : product.kind === "บริการ" ? (
             <Badge tone="muted">ไม่นับสต๊อก</Badge>
           ) : (
@@ -149,7 +157,16 @@ export function ProductDetailPage() {
             { header: "วันที่", cell: (m) => fmtDate(m.date) },
             {
               header: "รายการ",
-              cell: (m) => <Badge tone={moveTone(m.type)}>{m.type}</Badge>,
+              cell: (m) => (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge tone={moveTone(m.type)}>{m.type}</Badge>
+                  {m.reason && (
+                    <Badge tone={m.reason === "ส่งซ่อม" ? "warn" : "danger"}>
+                      {m.reason}
+                    </Badge>
+                  )}
+                </div>
+              ),
             },
             {
               header: "จำนวน",

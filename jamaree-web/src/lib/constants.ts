@@ -3,6 +3,7 @@ import type {
   CustodyType,
   DocStatus,
   DocType,
+  MoveReason,
   MoveType,
   OrderStatus,
   PersonType,
@@ -36,11 +37,38 @@ export const GAS_FILL_KINDS: ReadonlyArray<ProductKind> = [
   "หมุนเวียน",
 ];
 
+/**
+ * ชนิดสินค้าที่ “สั่งซื้อไม่ได้” — ไม่โผล่ในดรอปดาวน์ใบสั่งซื้อ
+ * น้ำแก๊ส/ถังหมุนเวียน = ไม่มีสต๊อกของตัวเอง (ตัดจากถังเก็บใหญ่ตอนขาย)
+ * ถังเต็ม = เกิดจากการบรรจุเองเท่านั้น · บริการ = ไม่ใช่ของที่ซื้อเข้าคลัง
+ */
+export const NON_PURCHASABLE_KINDS: ReadonlyArray<ProductKind> = [
+  "น้ำแก๊ส",
+  "หมุนเวียน",
+  "เต็ม",
+  "บริการ",
+];
+
+/** กิโลจากชื่อขนาด: '11.5kg' → 11.5 · ไม่มีตัวเลขนำหน้า → 0 (คู่กับ size_kg() ในฐานข้อมูล) */
+export function sizeKg(size: string | null | undefined): number {
+  const m = /^\d+(\.\d+)?/.exec((size ?? "").trim());
+  return m ? Number(m[0]) : 0;
+}
+
 export const MOVE_TYPES: ReadonlyArray<MoveType> = [
   "รับเข้า",
   "เบิกออก",
   "ปรับเพิ่ม",
   "ปรับลด",
+];
+
+/** เหตุผลตอนเบิกถังชำรุดออก — ใช้สรุปถังที่ตัดจำหน่ายรายปี */
+export const MOVE_REASONS: ReadonlyArray<{
+  value: MoveReason;
+  label: string;
+}> = [
+  { value: "ส่งซ่อม", label: "ส่งซ่อม (ได้ถังกลับมา)" },
+  { value: "ทำลาย/ตัดจำหน่าย", label: "ทำลาย/ตัดจำหน่าย (หายถาวร)" },
 ];
 
 /** ไทม์ไลน์ออเดอร์ — เดินหน้าทางเดียว */

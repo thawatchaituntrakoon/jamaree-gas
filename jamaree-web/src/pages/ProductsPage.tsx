@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ProductThumb } from "@/components/ui/ProductThumb";
 import {
   GAS_FILL_KINDS,
+  MOVE_REASONS,
   PRODUCT_KINDS,
   fmtBaht,
   fmtQty,
@@ -27,7 +28,13 @@ import {
 import { useDerived } from "@/lib/useDerived";
 import { uploadProductImage } from "@/lib/uploadProductImage";
 import { useAppStore } from "@/store/useAppStore";
-import type { MoveType, Product, ProductInput, ProductKind } from "@/types";
+import type {
+  MoveReason,
+  MoveType,
+  Product,
+  ProductInput,
+  ProductKind,
+} from "@/types";
 
 const BLANK: ProductInput = {
   name: "",
@@ -48,8 +55,21 @@ function usesRawGas(kind: ProductKind) {
   return GAS_FILL_KINDS.includes(kind);
 }
 
+/** น้ำแก๊สไม่มีสต๊อกของตัวเอง — โชว์ว่าแก๊สที่เหลือบรรจุได้กี่ใบแทน */
+function FillableText({ qty }: { qty: number | null }) {
+  if (qty == null) {
+    return <span className="text-xs text-muted">ตัดจากถังใหญ่</span>;
+  }
+  return (
+    <span className={qty <= 0 ? "font-medium text-danger" : "text-ink"}>
+      {fmtQty(qty)} ใบ
+      <span className="block text-xs text-muted">บรรจุได้จากถังใหญ่</span>
+    </span>
+  );
+}
+
 export function ProductsPage() {
-  const { products, lowStock } = useDerived();
+  const { products, lowStock, fillableForSize } = useDerived();
   const saveProduct = useAppStore((s) => s.saveProduct);
   const addMove = useAppStore((s) => s.addMove);
 
@@ -64,6 +84,7 @@ export function ProductsPage() {
   const [moveType, setMoveType] = useState<MoveType>("รับเข้า");
   const [moveQty, setMoveQty] = useState("");
   const [moveNote, setMoveNote] = useState("");
+  const [moveReason, setMoveReason] = useState<MoveReason | "">("");
 
   const [busy, setBusy] = useState(false);
 
@@ -176,12 +197,14 @@ export function ProductsPage() {
     setMoveType(type);
     setMoveQty("");
     setMoveNote("");
+    setMoveReason("");
   }
 
   async function submitMove() {
     if (!moveFor) return;
     const qty = Number(moveQty);
     if (!(qty > 0)) return;
+    if (needsReason && !moveReason) return;
     setBusy(true);
     try {
       await addMove({
@@ -189,6 +212,7 @@ export function ProductsPage() {
         type: moveType,
         qty,
         note: moveNote.trim(),
+        reason: needsReason ? (moveReason as MoveReason) : null,
       });
       setMoveFor(null);
     } catch {
@@ -199,6 +223,9 @@ export function ProductsPage() {
   }
 
   const kindIsService = form.kind === "บริการ";
+
+  // ถังชำรุดที่เบิกออกต้องระบุปลายทาง — ไว้สรุปถังที่ตัดจำหน่ายรายปี
+  const needsReason = moveFor?.kind === "ชำรุด" && moveType === "เบิกออก";
 
   return (
     <>
@@ -273,7 +300,7 @@ export function ProductsPage() {
               align: "right",
               cell: (p) =>
                 usesRawGas(p.kind) ? (
-                  <span className="text-xs text-muted">ตัดจากถังใหญ่</span>
+                  <FillableText qty={fillableForSize(p.size, p.fill_kg)} />
                 ) : p.kind === "บริการ" ? (
                   <span className="text-xs text-muted">ไม่นับสต๊อก</span>
                 ) : (
@@ -573,7 +600,9 @@ export function ProductsPage() {
             <Button
               variant={moveType === "รับเข้า" ? "ok" : "primary"}
               onClick={submitMove}
-              disabled={busy || !(Number(moveQty) > 0)}
+              disabled={
+                busy || !(Number(moveQty) > 0) || (needsReason && !moveReason)
+              }
             >
               {busy ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
@@ -618,6 +647,30 @@ export function ProductsPage() {
                 />
               )}
             </Field>
+
+            {needsReason && (
+              <Field
+                label="เอาถังไปทำอะไร"
+                hint="ต้องเลือกก่อน — ถังที่ตัดจำหน่ายจะถูกรวมเป็นยอดรายปี"
+              >
+                {(id) => (
+                  <Select
+                    id={id}
+                    value={moveReason}
+                    onChange={(e) =>
+                      setMoveReason(e.target.value as MoveReason | "")
+                    }
+                  >
+                    <option value="">— เลือกเหตุผล —</option>
+                    {MOVE_REASONS.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            )}
 
             {moveType === "เบิกออก" &&
               Number(moveQty) > Number(moveFor.stock) && (

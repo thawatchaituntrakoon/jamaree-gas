@@ -2334,6 +2334,505 @@ alter table public.staff drop column if exists user_id;
 ------------------------------------------------------------------------------- */
 
 
+-- ============================================================
+-- 15. แก้ตรรกะตัดสต๊อกตอนขาย (เพิ่มรอบที่ 11 — รันซ้ำได้)
+--
+-- ของเดิมพลาด 2 เรื่อง:
+--   • ขาย "ถังใหม่" → ตัดแค่จำนวนถัง ไม่ตัดแก๊สที่บรรจุใส่ไป = แก๊สหายจากบัญชี
+--   • ขาย "น้ำแก๊ส/ถังหมุนเวียน" ในร้านที่ยังไม่ได้ตั้งสินค้า "ถังเต็ม"
+--     → ตัดแก๊สดิบอย่างเดียว ไม่ได้รับถังเปล่าที่ลูกค้าเอามาแลกเข้าคลัง
+-- ============================================================
+
+-- กิโลจากชื่อขนาด: '11.5kg' → 11.5 · ไม่มีตัวเลขนำหน้า → null
+create or replace function public.size_kg(p_size text)
+returns numeric
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select nullif(
+    substring(btrim(coalesce(p_size, '')) from '^[0-9]+(\.[0-9]+)?'), ''
+  )::numeric;
+$$;
+
+-- กิโลแก๊สต่อถังของขนาดหนึ่ง — ใช้กับถังใหม่ที่ไม่ได้กรอก fill_kg ไว้
+-- ลำดับ: ค่าที่กรอกเอง → สินค้าน้ำแก๊สขนาดเดียวกัน → เดาจากชื่อขนาด
+create or replace function public.cyl_fill_kg(
+  p_size    text,
+  p_fill_kg numeric default null
+)
+returns numeric
+language sql
+stable
+set search_path = public, pg_temp
+as $$
+  select coalesce(
+    nullif(p_fill_kg, 0),
+    (select p.fill_kg
+       from public.products p
+      where p.kind in ('น้ำแก๊ส', 'หมุนเวียน')
+        and btrim(coalesce(p.size, '')) = btrim(coalesce(p_size, ''))
+        and p.active
+        and p.fill_kg is not null and p.fill_kg > 0
+      order by p.created_at limit 1),
+    public.size_kg(p_size)
+  );
+$$;
+
+grant execute on function public.size_kg(text)              to authenticated;
+grant execute on function public.cyl_fill_kg(text, numeric) to authenticated;
+
+
+create or replace function public.complete_order(p_order_id uuid)
+returns public.orders
+security definer
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_order    public.orders;
+  v_raw      public.products;
+  v_raw_kg   numeric := 0;
+  v_total    numeric;
+  v_remain   numeric;
+  v_short    record;
+  v_item     record;
+  v_kg       numeric;
+  v_full_id  uuid;
+  v_empty_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'ต้องเข้าสู่ระบบก่อน';
+  end if;
+
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception 'ไม่พบออเดอร์ที่ต้องการ';
+  end if;
+  if v_order.voided then
+    raise exception 'ออเดอร์นี้ถูกยกเลิกไปแล้ว';
+  end if;
+  if v_order.stock_deducted then
+    raise exception 'ออเดอร์นี้ปิดไปแล้ว';
+  end if;
+  if not exists (select 1 from public.order_items where order_id = p_order_id) then
+    raise exception 'ออเดอร์นี้ยังไม่มีรายการสินค้า';
+  end if;
+
+  -- 0) ถังใหม่ทุกบรรทัดต้องรู้ว่าบรรจุกี่กิโล ไม่งั้นแก๊สจะหายจากบัญชี
+  select p.name as name
+    into v_short
+    from public.order_items oi
+    join public.products p on p.id = oi.product_id
+   where oi.order_id = p_order_id
+     and p.kind = 'ใหม่'
+     and coalesce(public.cyl_fill_kg(p.size, p.fill_kg), 0) <= 0
+   limit 1;
+  if found then
+    raise exception 'ยังไม่รู้ว่า "%" บรรจุแก๊สกี่กิโล — ใส่ขนาดถัง (เช่น 15kg) ที่ทะเบียนสินค้าก่อน',
+      v_short.name;
+  end if;
+
+  -- 1) แก๊สดิบที่ต้องใช้
+  --    • น้ำแก๊ส/ถังหมุนเวียน → นับเฉพาะไซส์ที่ "ยังไม่มีถังเต็ม" (ไซส์ที่มีถังเต็มตัดไปตอนบรรจุแล้ว)
+  --    • ถังใหม่ → นับเสมอ เพราะบรรจุจากถังเก็บใหญ่ตอนขาย
+  select coalesce(sum(
+           case
+             when p.kind in ('น้ำแก๊ส', 'หมุนเวียน')
+                  and public.full_cyl_id(p.size) is null
+               then oi.qty * coalesce(p.fill_kg, 0)
+             when p.kind = 'ใหม่'
+               then oi.qty * coalesce(public.cyl_fill_kg(p.size, p.fill_kg), 0)
+             else 0
+           end), 0)
+    into v_raw_kg
+    from public.order_items oi
+    join public.products p on p.id = oi.product_id
+   where oi.order_id = p_order_id;
+
+  -- 2) ของที่มีสต๊อกของตัวเอง ต้องพอ
+  select p.name as name, p.stock as stock
+    into v_short
+    from public.order_items oi
+    join public.products p on p.id = oi.product_id
+   where oi.order_id = p_order_id
+     and p.kind not in ('น้ำแก๊ส', 'หมุนเวียน', 'บริการ')
+   group by p.id, p.name, p.stock
+  having sum(oi.qty) > p.stock
+   limit 1;
+  if found then
+    raise exception 'ของไม่พอ: % เหลือ %', v_short.name, trim_scale(v_short.stock);
+  end if;
+
+  -- 2.5) ถังเต็มต้องพอ (รวมทุกบรรทัดที่ใช้ถังเต็มใบเดียวกัน)
+  select f.name as name, f.stock as stock
+    into v_short
+    from public.order_items oi
+    join public.products p on p.id = oi.product_id
+    join public.products f on f.id = public.full_cyl_id(p.size)
+   where oi.order_id = p_order_id
+     and p.kind in ('น้ำแก๊ส', 'หมุนเวียน')
+   group by f.id, f.name, f.stock
+  having sum(oi.qty) > f.stock
+   limit 1;
+  if found then
+    raise exception 'ถังเต็มไม่พอ: % เหลือ %', v_short.name, trim_scale(v_short.stock);
+  end if;
+
+  -- 3) แก๊สดิบในถังเก็บใหญ่พอไหม
+  if v_raw_kg > 0 then
+    select * into v_raw from public.products where kind = 'ดิบ';
+    if not found then
+      raise exception 'ยังไม่ได้ตั้งสินค้าแก๊สดิบ (ถังเก็บใหญ่) ในระบบ';
+    end if;
+    if v_raw.stock < v_raw_kg then
+      raise exception 'แก๊สดิบไม่พอ: ต้องใช้ % kg เหลือ % kg',
+        trim_scale(v_raw_kg), trim_scale(v_raw.stock);
+    end if;
+  end if;
+
+  -- 4) ตัดสต๊อกจริง
+  for v_item in
+    select oi.qty, p.id as product_id, p.kind, p.fill_kg, p.name, p.size
+      from public.order_items oi
+      join public.products p on p.id = oi.product_id
+     where oi.order_id = p_order_id
+  loop
+    if v_item.kind = 'บริการ' then
+      continue;
+
+    elsif v_item.kind in ('น้ำแก๊ส', 'หมุนเวียน') then
+      v_full_id := public.full_cyl_id(v_item.size);
+
+      if v_full_id is not null then
+        perform public.add_move(v_full_id, 'เบิกออก', v_item.qty,
+          'ขายถังเต็ม ' || coalesce(nullif(v_item.size, ''), v_item.name),
+          'order', p_order_id);
+      else
+        if v_raw.id is null then
+          select * into v_raw from public.products where kind = 'ดิบ';
+        end if;
+        perform public.add_move(
+          v_raw.id, 'เบิกออก', v_item.qty * v_item.fill_kg,
+          'ขายแก๊ส ' || coalesce(nullif(v_item.size, ''), v_item.name)
+            || ' x' || trim_scale(v_item.qty),
+          'order', p_order_id);
+      end if;
+
+      -- ถังแลกถัง — รับถังเปล่าจากลูกค้าเข้าคลังเสมอ ไม่ว่าจะตัดจากถังเต็มหรือแก๊สดิบ
+      v_empty_id := public.empty_cyl_id(v_item.size);
+      if v_empty_id is not null then
+        perform public.add_move(v_empty_id, 'รับเข้า', v_item.qty,
+          'รับถังเปล่าคืน (ถังแลกถัง)', 'order', p_order_id);
+      end if;
+
+    elsif v_item.kind = 'ใหม่' then
+      -- ขายถังใหม่ = ถังหายไป 1 ใบ + แก๊สที่บรรจุใส่ไปหายจากถังเก็บใหญ่
+      perform public.add_move(v_item.product_id, 'เบิกออก', v_item.qty,
+        'ขายถังใหม่', 'order', p_order_id);
+
+      v_kg := public.cyl_fill_kg(v_item.size, v_item.fill_kg);
+      if v_raw.id is null then
+        select * into v_raw from public.products where kind = 'ดิบ';
+      end if;
+      perform public.add_move(
+        v_raw.id, 'เบิกออก', v_item.qty * v_kg,
+        'บรรจุแก๊สใส่ถังใหม่ ' || coalesce(nullif(v_item.size, ''), v_item.name)
+          || ' x' || trim_scale(v_item.qty),
+        'order', p_order_id);
+
+    else
+      perform public.add_move(
+        v_item.product_id, 'เบิกออก', v_item.qty, 'ขาย/ออเดอร์', 'order', p_order_id);
+    end if;
+  end loop;
+
+  -- 5) ลงบัญชี — จ่ายผสมได้ (สด + โอน) ส่วนที่เหลือเป็นลูกหนี้อัตโนมัติ
+  v_total  := public.order_total(p_order_id);
+  v_remain := greatest(0, v_total - v_order.paid_cash - v_order.paid_transfer);
+
+  if v_order.paid_cash > 0 then
+    insert into public.transactions (date, type, amount, note, category, ref_type, ref_id)
+    values (v_order.date, 'เข้า', v_order.paid_cash, 'ขายออเดอร์ (สด)', 'ขาย', 'order', p_order_id);
+  end if;
+  if v_order.paid_transfer > 0 then
+    insert into public.transactions (date, type, amount, note, category, ref_type, ref_id)
+    values (v_order.date, 'เข้า', v_order.paid_transfer, 'ขายออเดอร์ (โอน)', 'ขาย', 'order', p_order_id);
+  end if;
+  if v_remain > 0 then
+    insert into public.transactions (date, type, amount, note, category, ref_type, ref_id, unpaid)
+    values (v_order.date, 'เข้า', v_remain, 'ขายออเดอร์ (ค้างชำระ)', 'ขาย', 'order', p_order_id, true);
+  end if;
+
+  -- 6) ปิดออเดอร์ — work_stage บังคับเป็น 'ปิด' เสมอ
+  update public.orders
+     set stock_deducted = true,
+         status         = 'เสร็จ',
+         work_stage     = 'ปิด'
+   where id = p_order_id
+   returning * into v_order;
+
+  return v_order;
+end;
+$$;
+
+revoke all on function public.complete_order(uuid) from public, anon;
+grant execute on function public.complete_order(uuid) to authenticated;
+
+
+-- ยกเลิกบิล — ย้อนให้ตรงกับทางที่ตัดไปข้างบนทุกเส้น
+create or replace function public.void_order(p_order_id uuid)
+returns public.orders
+security definer
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_order    public.orders;
+  v_raw      public.products;
+  v_item     record;
+  v_kg       numeric;
+  v_full_id  uuid;
+  v_empty_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'ต้องเข้าสู่ระบบก่อน';
+  end if;
+
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception 'ไม่พบออเดอร์ที่ต้องการ';
+  end if;
+  if v_order.voided then
+    raise exception 'ออเดอร์นี้ถูกยกเลิกไปแล้ว';
+  end if;
+
+  if v_order.stock_deducted then
+    select * into v_raw from public.products where kind = 'ดิบ';
+
+    for v_item in
+      select oi.qty, p.id as product_id, p.kind, p.fill_kg, p.name, p.size
+        from public.order_items oi
+        join public.products p on p.id = oi.product_id
+       where oi.order_id = p_order_id
+    loop
+      if v_item.kind = 'บริการ' then
+        continue;
+
+      elsif v_item.kind in ('น้ำแก๊ส', 'หมุนเวียน') then
+        v_full_id := public.full_cyl_id(v_item.size);
+
+        if v_full_id is not null then
+          perform public.add_move(v_full_id, 'รับเข้า', v_item.qty,
+            'ยกเลิกบิล (คืนถังเต็ม)', 'order', p_order_id);
+        else
+          perform public.add_move(v_raw.id, 'รับเข้า', v_item.qty * v_item.fill_kg,
+            'ยกเลิกบิล (คืนแก๊สดิบ)', 'order', p_order_id);
+        end if;
+
+        v_empty_id := public.empty_cyl_id(v_item.size);
+        if v_empty_id is not null then
+          perform public.add_move(v_empty_id, 'เบิกออก', v_item.qty,
+            'ยกเลิกบิล (คืนถังเปล่าให้ลูกค้า)', 'order', p_order_id);
+        end if;
+
+      elsif v_item.kind = 'ใหม่' then
+        perform public.add_move(v_item.product_id, 'รับเข้า', v_item.qty,
+          'ยกเลิกบิล (คืนถังใหม่)', 'order', p_order_id);
+
+        v_kg := coalesce(public.cyl_fill_kg(v_item.size, v_item.fill_kg), 0);
+        if v_kg > 0 then
+          perform public.add_move(v_raw.id, 'รับเข้า', v_item.qty * v_kg,
+            'ยกเลิกบิล (คืนแก๊สดิบ)', 'order', p_order_id);
+        end if;
+
+      else
+        perform public.add_move(v_item.product_id, 'รับเข้า', v_item.qty,
+          'ยกเลิกบิล (คืนสต๊อก)', 'order', p_order_id);
+      end if;
+    end loop;
+
+    delete from public.transactions where ref_type = 'order' and ref_id = p_order_id;
+  end if;
+
+  update public.orders
+     set voided = true, status = 'ยกเลิก'
+   where id = p_order_id
+   returning * into v_order;
+
+  return v_order;
+end;
+$$;
+
+revoke all on function public.void_order(uuid) from public, anon;
+grant execute on function public.void_order(uuid) to authenticated;
+
+
+-- ============================================================
+-- 16. ขนาดถังมาตรฐานครบชุด (เพิ่มรอบที่ 12 — รันซ้ำได้)
+--
+-- ของเดิมหว่านขนาดถังครั้งเดียวตอนตารางยังว่าง ฐานที่ตั้งไปแล้วเลยไม่เคยได้ 11.5kg
+-- รอบนี้เติมทีละแถว ฐานเก่าก็ได้ของที่ขาดไป
+-- ============================================================
+
+insert into public.cylinder_sizes (name, sort_order, deposit_price)
+select v.name, v.ord, 0
+from (values ('4kg', 1), ('11.5kg', 2), ('15kg', 3), ('48kg', 4))
+     as v(name, ord)
+on conflict (name) do nothing;
+
+-- เรียงให้เป็นลำดับเดียวกันเสมอ ส่วนขนาดนอกมาตรฐาน (เช่น 7kg ที่เคยหว่านไว้) ไปต่อท้าย
+update public.cylinder_sizes s
+   set sort_order = v.ord
+  from (values ('4kg', 1), ('11.5kg', 2), ('15kg', 3), ('48kg', 4))
+       as v(name, ord)
+ where s.name = v.name and s.sort_order <> v.ord;
+
+update public.cylinder_sizes
+   set sort_order = 99
+ where name not in ('4kg', '11.5kg', '15kg', '48kg')
+   and sort_order < 99;
+
+-- สินค้าถังเปล่า/ถังหมุนเวียนของแต่ละขนาด — ไม่มีก็สร้างให้ มีอยู่แล้วไม่แตะ
+do $$
+declare
+  v record;
+begin
+  for v in
+    select * from (values
+      ('4kg', 4.0), ('11.5kg', 11.5), ('15kg', 15.0), ('48kg', 48.0)
+    ) as t(size, kg)
+  loop
+    if not exists (
+      select 1 from public.products
+       where kind = 'เปล่า' and btrim(coalesce(size, '')) = v.size
+    ) then
+      insert into public.products (sku, name, unit, kind, size)
+      values ('CYL-EMPTY-' || upper(v.size), 'ถังเปล่า ' || v.size, 'ใบ', 'เปล่า', v.size)
+      on conflict (sku) do nothing;
+    end if;
+
+    if not exists (
+      select 1 from public.products
+       where kind = 'หมุนเวียน' and btrim(coalesce(size, '')) = v.size
+    ) then
+      insert into public.products (sku, name, unit, kind, size, fill_kg)
+      values ('CYL-ROT-' || upper(v.size), 'ถังหมุนเวียน ' || v.size, 'ใบ',
+              'หมุนเวียน', v.size, v.kg)
+      on conflict (sku) do nothing;
+    end if;
+  end loop;
+end;
+$$;
+
+/* ---------- ⚠️ ลบขนาด 7kg ที่หว่านไว้ตั้งแต่แรก — รันเองเมื่อแน่ใจว่าไม่ได้ใช้ ----------
+
+delete from public.cylinder_sizes
+ where name = '7kg'
+   and not exists (select 1 from public.products          where btrim(coalesce(size, '')) = '7kg')
+   and not exists (select 1 from public.cylinder_custody  where size = '7kg')
+   and not exists (select 1 from public.cylinder_deposits where size = '7kg');
+
+------------------------------------------------------------------------------- */
+
+
+-- ============================================================
+-- 17. เหตุผลตอนเบิกถังชำรุดออก (เพิ่มรอบที่ 13 — รันซ้ำได้)
+--
+-- ถังชำรุดที่เบิกออกมี 2 ปลายทางคนละเรื่องกัน: ส่งไปซ่อมแล้วได้กลับมา
+-- กับตัดจำหน่ายทิ้งถาวร — ต้องแยกให้ออก ไม่งั้นสรุปถังที่ตัดจำหน่ายรายปีไม่ได้
+-- เก็บเป็นคอลัมน์ ไม่ใช่ข้อความในโน้ต เพราะต้องเอาไปรวมยอดตามปี
+-- ============================================================
+
+alter table public.stock_moves
+  add column if not exists reason text;
+
+alter table public.stock_moves drop constraint if exists stock_moves_reason_check;
+alter table public.stock_moves add constraint stock_moves_reason_check
+  check (reason is null or reason in ('ส่งซ่อม', 'ทำลาย/ตัดจำหน่าย'));
+
+create index if not exists stock_moves_reason_idx
+  on public.stock_moves (reason, date) where reason is not null;
+
+comment on column public.stock_moves.reason is
+  'เหตุผลตอนเบิกถังชำรุดออก — ส่งซ่อม (ได้กลับมา) หรือ ทำลาย/ตัดจำหน่าย (หายถาวร)';
+
+-- เพิ่มพารามิเตอร์ตัวที่ 7 — ต้อง drop ก่อน เพราะ create or replace เปลี่ยนจำนวนพารามิเตอร์ไม่ได้
+drop function if exists public.add_move(uuid, text, numeric, text, text, uuid);
+
+create or replace function public.add_move(
+  p_product_id uuid,
+  p_type       text,
+  p_qty        numeric,
+  p_note       text default '',
+  p_ref_type   text default null,
+  p_ref_id     uuid default null,
+  p_reason     text default null
+)
+returns public.stock_moves
+security definer
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_delta numeric;
+  v_stock numeric;
+  v_name  text;
+  v_kind  text;
+  v_move  public.stock_moves;
+begin
+  if auth.uid() is null then
+    raise exception 'ต้องเข้าสู่ระบบก่อน';
+  end if;
+
+  if p_qty is null or p_qty <= 0 then
+    raise exception 'จำนวนต้องมากกว่า 0';
+  end if;
+
+  v_delta := case
+    when p_type in ('รับเข้า', 'ปรับเพิ่ม') then  p_qty
+    when p_type in ('เบิกออก', 'ปรับลด')   then -p_qty
+  end;
+
+  if v_delta is null then
+    raise exception 'ประเภทการเคลื่อนไหวไม่ถูกต้อง: %', p_type;
+  end if;
+
+  perform set_config('app.in_add_move', 'on', true);
+
+  update public.products
+     set stock = stock + v_delta
+   where id = p_product_id
+   returning stock, name, kind into v_stock, v_name, v_kind;
+
+  if not found then
+    raise exception 'ไม่พบสินค้าที่ต้องการ';
+  end if;
+
+  if v_stock < 0 then
+    raise exception 'ของไม่พอ: % เหลือ %', v_name, v_stock - v_delta;
+  end if;
+
+  -- เบิกถังชำรุดออกต้องบอกเสมอว่าส่งซ่อมหรือตัดจำหน่าย
+  if v_kind = 'ชำรุด' and p_type = 'เบิกออก' and p_reason is null then
+    raise exception 'เบิกถังชำรุดออกต้องเลือกเหตุผลก่อน (ส่งซ่อม หรือ ทำลาย/ตัดจำหน่าย)';
+  end if;
+
+  insert into public.stock_moves (product_id, type, qty, note, ref_type, ref_id, reason)
+  values (p_product_id, p_type, p_qty, coalesce(p_note, ''), p_ref_type, p_ref_id, p_reason)
+  returning * into v_move;
+
+  perform set_config('app.in_add_move', 'off', true);
+  return v_move;
+end;
+$$;
+
+revoke all on function public.add_move(uuid, text, numeric, text, text, uuid, text)
+  from public, anon;
+grant execute on function public.add_move(uuid, text, numeric, text, text, uuid, text)
+  to authenticated;
+
+
 
 
 

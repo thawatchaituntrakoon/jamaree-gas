@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Ban, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -12,9 +12,13 @@ import { fmtBaht, fmtDate, todayStr, workStageTone } from "@/lib/constants";
 import { uid } from "@/lib/uid";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
-import type { Order, OrderItemInput, UUID } from "@/types";
+import { roleAllowed, useAuthStore } from "@/store/useAuthStore";
+import type { AccessRole, Order, OrderItemInput, UUID } from "@/types";
 
 type Filter = "ค้างส่ง" | "ทั้งหมด";
+
+/** ยกเลิกบิลที่ตัดสต๊อกไปแล้ว = คืนของเข้าคลัง + ลบเงินออกจากบัญชี — จำกัดไว้ที่หัวหน้า */
+const VOID_ROLES: readonly AccessRole[] = ["SUPER_ADMIN", "MANAGER"];
 
 interface DraftItem extends OrderItemInput {
   /** คีย์ชั่วคราวสำหรับ React เท่านั้น ไม่ได้บันทึกลงฐานข้อมูล */
@@ -36,11 +40,16 @@ export function OrdersPage() {
     customerName,
   } = useDerived();
   const saveOrder = useAppStore((s) => s.saveOrder);
+  const voidOrder = useAppStore((s) => s.voidOrder);
   const priceTiers = useAppStore((s) => s.priceTiers);
+  const role = useAuthStore((s) => s.simulatedRole ?? s.role);
+  const canVoid = roleAllowed(role, VOID_ROLES);
+  const navigate = useNavigate();
 
   const [filter, setFilter] = useState<Filter>("ค้างส่ง");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Order | null>(null);
+  const [voidFor, setVoidFor] = useState<Order | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [customerId, setCustomerId] = useState<UUID | "">("");
@@ -109,7 +118,6 @@ export function OrdersPage() {
       .filter((it) => it.product_id && Number(it.qty) > 0)
       .map(({ product_id, qty }) => ({ product_id, qty: Number(qty) }));
     if (!clean.length) return;
-
     setBusy(true);
     try {
       await saveOrder(
@@ -123,6 +131,19 @@ export function OrdersPage() {
         editing?.id,
       );
       setOpen(false);
+    } catch {
+      // ข้อความผิดพลาดโชว์บนแถบเตือนด้านบนแล้ว
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitVoid() {
+    if (!voidFor) return;
+    setBusy(true);
+    try {
+      await voidOrder(voidFor.id);
+      setVoidFor(null);
     } catch {
       // ข้อความผิดพลาดโชว์บนแถบเตือนด้านบนแล้ว
     } finally {
@@ -219,17 +240,38 @@ export function OrdersPage() {
             {
               header: "",
               align: "right",
-              cell: (o) =>
-                !o.stock_deducted && !o.voided ? (
+              cell: (o) => (
+                <div className="flex flex-wrap justify-end gap-1">
+                  {!o.stock_deducted && !o.voided && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<Pencil size={14} />}
+                      onClick={() => openEdit(o)}
+                    >
+                      แก้ไข
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
-                    icon={<Pencil size={14} />}
-                    onClick={() => openEdit(o)}
+                    icon={<Eye size={14} />}
+                    onClick={() => navigate(`/orders/${o.id}`)}
                   >
-                    แก้ไข
+                    ดูรายละเอียด
                   </Button>
-                ) : null,
+                  {canVoid && o.stock_deducted && !o.voided && (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon={<Ban size={14} />}
+                      onClick={() => setVoidFor(o)}
+                    >
+                      ยกเลิกบิล
+                    </Button>
+                  )}
+                </div>
+              ),
             },
           ]}
         />
@@ -318,7 +360,7 @@ export function OrdersPage() {
                     aria-label={`จำนวนบรรทัดที่ ${idx + 1}`}
                     type="number"
                     min={0}
-                    step="0.01"
+                    step="1"
                     value={it.qty}
                     onChange={(e) =>
                       setItems(
@@ -427,6 +469,31 @@ export function OrdersPage() {
             </p>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={voidFor !== null}
+        onClose={() => setVoidFor(null)}
+        title="ยกเลิกบิลนี้?"
+        hint={voidFor ? `บิลวันที่ ${fmtDate(voidFor.date)}` : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setVoidFor(null)}>
+              ไม่ยกเลิก
+            </Button>
+            <Button variant="danger" disabled={busy} onClick={submitVoid}>
+              {busy ? "กำลังยกเลิก…" : "ยืนยันยกเลิกบิล"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink">
+          ระบบจะ<b>คืนของเข้าสต๊อกกลับทั้งหมด</b>{" "}
+          และลบยอดเงินของบิลนี้ออกจากบัญชี
+        </p>
+        <p className="mt-2 text-sm text-muted">
+          ตัวบิลจะยังอยู่ในประวัติ แค่ถูกทำเครื่องหมายว่ายกเลิกแล้ว
+        </p>
       </Modal>
     </>
   );

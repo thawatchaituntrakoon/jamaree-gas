@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { GAS_FILL_KINDS } from "@/lib/constants";
+import { GAS_FILL_KINDS, sizeKg } from "@/lib/constants";
 import { useAppStore } from "@/store/useAppStore";
 import type {
   Leave,
@@ -196,6 +196,18 @@ export function useDerived() {
 
     /** แก๊สดิบในถังเก็บใหญ่ — มีได้แถวเดียว */
     const rawGas = products.find((p) => p.kind === "ดิบ");
+    const rawGasKg = Math.max(0, Number(rawGas?.stock ?? 0));
+
+    /** แก๊สที่เหลือบรรจุถังขนาดนี้ได้กี่ใบ — null = ยังไม่รู้กิโลต่อถัง */
+    const fillableForSize = (
+      size: string | null | undefined,
+      fillKg?: number | null,
+    ): number | null => {
+      const kg = Number(fillKg) || sizeKg(size);
+      return kg > 0 ? Math.floor(rawGasKg / kg) : null;
+    };
+
+    const fillableQty = (p: Product) => fillableForSize(p.size, p.fill_kg);
 
     const vendorById = (id: UUID | null | undefined) =>
       vendors.find((v) => v.id === id);
@@ -352,6 +364,9 @@ export function useDerived() {
       custodyBalance,
       lowStock,
       rawGas,
+      rawGasKg,
+      fillableForSize,
+      fillableQty,
       vendors,
       pos,
       vendorById,

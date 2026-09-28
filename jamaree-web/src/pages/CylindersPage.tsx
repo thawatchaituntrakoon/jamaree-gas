@@ -21,7 +21,8 @@ import type {
 type Tab = "stock" | "deposits";
 
 export function CylindersPage() {
-  const { customers, customerName, deposits, depositHeld } = useDerived();
+  const { customers, customerName, deposits, depositHeld, fillableForSize } =
+    useDerived();
   const cylinderStock = useAppStore((s) => s.cylinderStock);
   const cylinderSizes = useAppStore((s) => s.cylinderSizes);
   const fillCylinders = useAppStore((s) => s.fillCylinders);
@@ -222,6 +223,26 @@ export function CylindersPage() {
                 cell: (r) => (
                   <span className="tabular-nums">{fmtQty(r.empty)}</span>
                 ),
+              },
+              {
+                header: "บรรจุได้อีก",
+                align: "right",
+                cell: (r) => {
+                  const byGas = fillableForSize(r.size);
+                  if (byGas == null) {
+                    return <span className="text-muted">—</span>;
+                  }
+                  // ทำได้จริงเท่ากับของที่น้อยกว่าระหว่าง แก๊สที่มี กับ ถังเปล่าที่รออยู่
+                  const real = Math.min(byGas, Number(r.empty));
+                  return (
+                    <span className="tabular-nums text-ink">
+                      {fmtQty(real)}
+                      <span className="block text-xs text-muted">
+                        แก๊สพอ {fmtQty(byGas)}
+                      </span>
+                    </span>
+                  );
+                },
               },
               {
                 header: "อยู่กับลูกค้า",

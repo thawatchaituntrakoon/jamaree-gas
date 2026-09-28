@@ -7,7 +7,14 @@ import { DataTable } from "@/components/ui/DataTable";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { fmtBaht, fmtDate, poStatusTone, todayStr } from "@/lib/constants";
+import {
+  NON_PURCHASABLE_KINDS,
+  fmtBaht,
+  fmtDate,
+  fmtQty,
+  poStatusTone,
+  todayStr,
+} from "@/lib/constants";
 import { uid } from "@/lib/uid";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
@@ -32,8 +39,9 @@ const newItem = (): DraftItem => ({
 });
 
 export function PurchasesPage() {
-  const { products, vendors, pos, vendorName, poTotal, vendorPayable } =
+  const { products, vendors, pos, rawGas, vendorName, poTotal, vendorPayable } =
     useDerived();
+  const settings = useAppStore((s) => s.settings);
   const savePurchaseOrder = useAppStore((s) => s.savePurchaseOrder);
   const nextPoNumber = useAppStore((s) => s.nextPoNumber);
   const sendPo = useAppStore((s) => s.sendPo);
@@ -79,6 +87,31 @@ export function PurchasesPage() {
     [received],
   );
 
+  /** สั่งซื้อได้เฉพาะของที่เข้าคลังจริง — น้ำแก๊ส/ถังเต็ม/บริการ ซื้อไม่ได้ */
+  const purchasable = useMemo(
+    () => products.filter((p) => !NON_PURCHASABLE_KINDS.includes(p.kind)),
+    [products],
+  );
+
+  // ---- ที่ว่างในถังเก็บใหญ่ (กันสั่งแก๊สดิบเกินความจุ) ----
+  const bulkCapacity = Math.max(0, Number(settings?.bulk_tank_kg ?? 0));
+  const bulkFree = Math.max(
+    0,
+    bulkCapacity - Math.max(0, Number(rawGas?.stock ?? 0)),
+  );
+
+  const bulkOrderKg = useMemo(
+    () =>
+      items.reduce((sum, it) => {
+        const p = products.find((x) => x.id === it.product_id);
+        return p?.kind === "ดิบ" ? sum + (Number(it.qty) || 0) : sum;
+      }, 0),
+    [items, products],
+  );
+
+  // ความจุยังไม่ได้ตั้ง (0) = ยังตรวจไม่ได้ ปล่อยผ่านไปก่อน
+  const bulkOverflow = bulkCapacity > 0 && bulkOrderKg > bulkFree;
+
   function toDraft(list: PoItem[]): DraftItem[] {
     return list.map((it) => ({
       key: uid(),
@@ -115,6 +148,15 @@ export function PurchasesPage() {
     });
   }
 
+  /** ใบเก่าที่เคยสั่งของต้องห้ามไว้ ยังต้องเห็นชื่อเดิมในดรอปดาวน์ ไม่งั้นจะเงียบหาย */
+  function optionsFor(productId: string) {
+    const legacy =
+      productId && !purchasable.some((p) => p.id === productId)
+        ? products.find((p) => p.id === productId)
+        : undefined;
+    return legacy ? [legacy, ...purchasable] : purchasable;
+  }
+
   function openNewPo() {
     setEditing(null);
     setVendorId("");
@@ -135,7 +177,7 @@ export function PurchasesPage() {
 
   async function submitPo() {
     const clean = toPoItems(items);
-    if (!vendorId || !clean.length) return;
+    if (!vendorId || !clean.length || bulkOverflow) return;
     setBusy(true);
     try {
       const number = editing ? editing.number : await nextPoNumber();
@@ -441,7 +483,10 @@ export function PurchasesPage() {
             <Button variant="secondary" onClick={() => setPoOpen(false)}>
               ยกเลิก
             </Button>
-            <Button onClick={submitPo} disabled={busy || !vendorId}>
+            <Button
+              onClick={submitPo}
+              disabled={busy || !vendorId || bulkOverflow}
+            >
               {busy ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </>
@@ -491,7 +536,7 @@ export function PurchasesPage() {
                     onChange={(e) => pickProduct(it.key, e.target.value)}
                   >
                     <option value="">ไม่ระบุสินค้า</option>
-                    {products.map((p) => (
+                    {optionsFor(it.product_id).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
@@ -548,9 +593,18 @@ export function PurchasesPage() {
               เพิ่มรายการ
             </Button>
             <p className="mt-1 text-xs text-muted">
-              “ไม่ระบุสินค้า” = สั่งได้ แต่ตอนรับของจะไม่เข้าสต๊อก
+              “ไม่ระบุสินค้า” = สั่งได้ แต่ตอนรับของจะไม่เข้าสต๊อก ·
+              น้ำแก๊ส/ถังเต็ม สั่งซื้อไม่ได้ (เกิดจากการบรรจุเอง)
             </p>
           </div>
+
+          {bulkOverflow && (
+            <p className="rounded-btn bg-danger-soft px-3 py-2.5 text-sm text-danger">
+              สั่งแก๊สดิบเกินความจุถังเก็บใหญ่ — สั่ง {fmtQty(bulkOrderKg)} kg
+              แต่เหลือที่ว่างแค่ {fmtQty(bulkFree)} kg (ความจุ{" "}
+              {fmtQty(bulkCapacity)} kg)
+            </p>
+          )}
 
           <Field label="หมายเหตุ">
             {(id) => (
