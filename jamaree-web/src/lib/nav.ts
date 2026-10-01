@@ -59,8 +59,8 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "แดชบอร์ด",
         path: "/",
         icon: LayoutDashboard,
-        // ทุกคนต้องมีหน้าให้ลง — กันเด้งไปมาวนไม่จบ
-        roles: ALL,
+        // รวมยอดเงินทั้งร้าน — สูงกว่าระดับการเงินเท่านั้นถึงเปิดได้ · คนอื่นเด้งไป landingPathFor()
+        roles: BOSS,
       },
       {
         key: "reports",
@@ -203,6 +203,15 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 /** สิทธิ์ของเมนูนั้น — หา path ไม่เจอ ให้ปิดไว้ก่อน ดีกว่าเปิดทิ้งไว้โดยไม่ตั้งใจ */
 export function rolesFor(path: string): readonly AccessRole[] {
   return NAV_ITEMS.find((i) => i.path === path)?.roles ?? ["SUPER_ADMIN"];
+}
+
+/** หน้าแรกที่สิทธิ์นี้เปิดได้จริง — คนที่ไม่มีสิทธิ์ดูแดชบอร์ดจะถูกเด้งมาที่นี่แทน */
+export function landingPathFor(role: AccessRole): string {
+  const item = NAV_ITEMS.find(
+    (i) => i.path !== "/" && !i.pending && i.roles.includes(role),
+  );
+  // ไม่เจอเลย = ปล่อยให้ด่านหน้าเส้นทางขึ้นหน้า "ไม่มีสิทธิ์" ดีกว่าเด้งวน
+  return item?.path ?? "/";
 }
 
 export function navItemByPath(pathname: string): NavItem | undefined {

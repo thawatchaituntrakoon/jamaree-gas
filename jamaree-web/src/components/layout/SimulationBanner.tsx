@@ -1,4 +1,5 @@
 import { Eye, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { accessRoleLabel } from "@/lib/constants";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -6,6 +7,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 export function SimulationBanner() {
   const simulatedRole = useAuthStore((s) => s.simulatedRole);
   const setSimulatedRole = useAuthStore((s) => s.setSimulatedRole);
+  const navigate = useNavigate();
 
   if (!simulatedRole) return null;
 
@@ -21,7 +23,10 @@ export function SimulationBanner() {
       </p>
       <button
         type="button"
-        onClick={() => setSimulatedRole(null)}
+        onClick={() => {
+          setSimulatedRole(null);
+          navigate("/", { replace: true });
+        }}
         className="flex shrink-0 items-center gap-1.5 rounded-btn bg-warn px-2.5 py-1.5 text-xs font-medium text-on-accent"
       >
         <X size={14} />

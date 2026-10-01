@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
-import { NAV_ITEMS, rolesFor } from "@/lib/nav";
+import { NAV_ITEMS, landingPathFor, rolesFor } from "@/lib/nav";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ComingSoonPage } from "@/pages/ComingSoonPage";
@@ -103,6 +103,7 @@ export default function App() {
   const session = useAuthStore((s) => s.session);
   const ready = useAuthStore((s) => s.ready);
   const init = useAuthStore((s) => s.init);
+  const role = useAuthStore((s) => s.simulatedRole ?? s.role);
 
   useEffect(() => init(), [init]);
 
@@ -145,7 +146,10 @@ export default function App() {
           <Route
             index
             element={
-              <ProtectedRoute allowedRoles={rolesFor("/")}>
+              <ProtectedRoute
+                allowedRoles={rolesFor("/")}
+                redirectTo={landingPathFor(role)}
+              >
                 <DashboardPage />
               </ProtectedRoute>
             }

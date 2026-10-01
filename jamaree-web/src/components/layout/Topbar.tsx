@@ -1,5 +1,7 @@
 import { Eye, Menu, Moon, Sun } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { ACCESS_ROLES, fmtDate, todayStr } from "@/lib/constants";
+import { landingPathFor } from "@/lib/nav";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useThemeStore } from "@/store/useThemeStore";
 import type { AccessRole } from "@/types";
@@ -18,6 +20,13 @@ export function Topbar({ title, onOpenMenu }: TopbarProps) {
   const isSuper = useAuthStore((s) => s.role === "SUPER_ADMIN");
   const simulatedRole = useAuthStore((s) => s.simulatedRole);
   const setSimulatedRole = useAuthStore((s) => s.setSimulatedRole);
+  const navigate = useNavigate();
+
+  function switchRole(next: AccessRole | null) {
+    setSimulatedRole(next);
+    // พาไปหน้าแรกของสิทธิ์นั้น ให้เห็นภาพเหมือนคนสิทธิ์นี้เพิ่งล็อกอินเข้ามาจริง ๆ
+    navigate(next ? landingPathFor(next) : "/", { replace: true });
+  }
 
   return (
     <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-card/90 px-4 py-3 backdrop-blur md:px-6">
@@ -51,7 +60,7 @@ export function Topbar({ title, onOpenMenu }: TopbarProps) {
           <select
             value={simulatedRole ?? ""}
             onChange={(e) =>
-              setSimulatedRole((e.target.value || null) as AccessRole | null)
+              switchRole((e.target.value || null) as AccessRole | null)
             }
             className="bg-transparent text-sm outline-none"
           >
