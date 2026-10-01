@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Chart } from "react-google-charts";
-import { Flame } from "lucide-react";
+import { Flame, SlidersHorizontal } from "lucide-react";
+import { BulkTankAdjustmentModal } from "@/components/dashboard/BulkTankAdjustmentModal";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field, TextInput } from "@/components/ui/Field";
@@ -19,9 +20,11 @@ export function BulkTankStatus() {
   const { rawGas } = useDerived();
   const settings = useAppStore((s) => s.settings);
   const saveSettings = useAppStore((s) => s.saveSettings);
+  const adjustBulkTankStock = useAppStore((s) => s.adjustBulkTankStock);
   const theme = useChartTheme();
 
   const [open, setOpen] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const [kg, setKg] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -55,6 +58,11 @@ export function BulkTankStatus() {
     }
   }
 
+  // ส่วนต่างกลายเป็นรายการปรับสต๊อก — ห้ามเขียนทับ stock ตรง ๆ ตัวเลขจะหลุดจากประวัติ
+  async function adjust(newKg: number, reason: string) {
+    await adjustBulkTankStock(newKg, reason);
+  }
+
   return (
     <>
       <Card className="p-4">
@@ -74,9 +82,20 @@ export function BulkTankStatus() {
               </p>
             )}
           </div>
-          <Button variant="ghost" size="sm" onClick={openSetup}>
-            ตั้งความจุ
-          </Button>
+          <div className="flex shrink-0 flex-wrap justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<SlidersHorizontal size={14} />}
+              disabled={!rawGas}
+              onClick={() => setAdjustOpen(true)}
+            >
+              ตั้งค่ายอดยกมา / ปรับปรุงสต๊อก
+            </Button>
+            <Button variant="ghost" size="sm" onClick={openSetup}>
+              ตั้งความจุ
+            </Button>
+          </div>
         </div>
 
         {!rawGas ? (
@@ -150,6 +169,14 @@ export function BulkTankStatus() {
           )}
         </Field>
       </Modal>
+
+      <BulkTankAdjustmentModal
+        open={adjustOpen}
+        currentKg={current}
+        capacityKg={capacity}
+        onClose={() => setAdjustOpen(false)}
+        onSubmit={adjust}
+      />
     </>
   );
 }

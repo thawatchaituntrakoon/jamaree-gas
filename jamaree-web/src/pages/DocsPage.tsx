@@ -1,6 +1,16 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import {
+  Building2,
+  Pencil,
+  Plus,
+  Printer,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useReactToPrint } from "react-to-print";
+import { DocPrintTemplate } from "@/components/print/DocPrintTemplate";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -17,7 +27,7 @@ import {
   fmtDate,
   todayStr,
 } from "@/lib/constants";
-import { docTypeTone } from "@/lib/docMath";
+import { docTypeTone, taxInvoiceProblems } from "@/lib/docMath";
 import { uid } from "@/lib/uid";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
@@ -63,9 +73,48 @@ export function DocsPage() {
   const [whtType, setWhtType] = useState("");
 
   const [deleteFor, setDeleteFor] = useState<TradeDocument | null>(null);
+  const [gate, setGate] = useState<{
+    doc: TradeDocument;
+    problems: string[];
+  } | null>(null);
 
   const [shopOpen, setShopOpen] = useState(false);
   const [shop, setShop] = useState<ShopSettingsInput>({});
+
+  // n = ตีตราเวลา บังคับให้ state เปลี่ยนจริงทุกครั้งที่กดพิมพ์ แม้เป็นใบเดิม
+  const [printJob, setPrintJob] = useState<{
+    doc: TradeDocument;
+    n: number;
+  } | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const printTitle = useRef("เอกสาร");
+  const docTitle = useCallback(() => printTitle.current, []);
+  const clearPrintJob = useCallback(() => setPrintJob(null), []);
+  const printDoc = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: docTitle,
+    onAfterPrint: clearPrintJob,
+  });
+
+  // ต้องรอให้เทมเพลตลงจอก่อน ไลบรารีถึงจะ clone ไปหน้าต่างพิมพ์ได้
+  useEffect(() => {
+    if (printJob) printDoc();
+  }, [printJob, printDoc]);
+
+  function startPrint(d: TradeDocument) {
+    // ใบกำกับภาษีเต็มรูปขาดข้อมูลไม่ได้ ม.86/4 — บล็อกก่อนออกกระดาษ
+    const problems = taxInvoiceProblems(
+      d,
+      customerById(d.customer_id),
+      settings,
+    );
+    if (problems.length) {
+      setGate({ doc: d, problems });
+      return;
+    }
+    printTitle.current = d.number;
+    setPrintJob({ doc: d, n: Date.now() });
+  }
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -144,7 +193,7 @@ export function DocsPage() {
     setItem(key, { name: p.name, price: String(p.price) });
   }
 
-  async function submitForm() {
+  async function submitForm(thenPrint = false) {
     const clean = items
       .filter((it) => it.name.trim() && Number(it.qty) > 0)
       .map((it) => ({
@@ -157,7 +206,7 @@ export function DocsPage() {
     setBusy(true);
     try {
       const number = editing ? editing.number : await nextDocNumber(docType);
-      await saveDocument(
+      const saved = await saveDocument(
         {
           type: docType,
           number,
@@ -178,6 +227,7 @@ export function DocsPage() {
         editing?.id,
       );
       setFormOpen(false);
+      if (thenPrint) startPrint(saved);
     } catch {
       // ข้อความผิดพลาดโชว์บนแถบเตือนด้านบนแล้ว
     } finally {
@@ -243,7 +293,6 @@ export function DocsPage() {
           </div>
         }
       />
-
       <Card>
         <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
           <div className="flex flex-wrap gap-1">
@@ -331,35 +380,45 @@ export function DocsPage() {
             {
               header: "",
               align: "right",
-              cell: (d) =>
-                d.status === "ร่าง" ? (
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<Pencil size={14} />}
-                      onClick={() => openEdit(d)}
-                    >
-                      แก้ไข
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<Trash2 size={14} />}
-                      onClick={() => setDeleteFor(d)}
-                    >
-                      ลบ
-                    </Button>
-                  </div>
-                ) : null,
+              cell: (d) => (
+                <div className="flex justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<Printer size={14} />}
+                    onClick={() => startPrint(d)}
+                  >
+                    พิมพ์ A4
+                  </Button>
+                  {d.status === "ร่าง" && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<Pencil size={14} />}
+                        onClick={() => openEdit(d)}
+                      >
+                        แก้ไข
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<Trash2 size={14} />}
+                        onClick={() => setDeleteFor(d)}
+                      >
+                        ลบ
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ),
             },
           ]}
         />
       </Card>
-
       {/* ---- ฟอร์มเอกสาร ---- */}
       <Modal
-        wide
+        full
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? `แก้ไข ${editing.number}` : "ออกเอกสารใหม่"}
@@ -374,7 +433,15 @@ export function DocsPage() {
               ยกเลิก
             </Button>
             <Button
-              onClick={submitForm}
+              variant="secondary"
+              icon={<Printer size={16} />}
+              onClick={() => submitForm(true)}
+              disabled={busy || !customerId || amount <= 0}
+            >
+              บันทึกและพิมพ์
+            </Button>
+            <Button
+              onClick={() => submitForm()}
               disabled={busy || !customerId || amount <= 0}
             >
               {busy ? "กำลังบันทึก…" : "บันทึก"}
@@ -434,7 +501,7 @@ export function DocsPage() {
               {items.map((it) => (
                 <div
                   key={it.key}
-                  className="grid gap-2 rounded-btn border border-line p-2 sm:grid-cols-[1fr_1fr_4.5rem_6rem_auto] sm:items-center sm:border-0 sm:p-0"
+                  className="grid gap-2 rounded-btn border border-line p-2 sm:grid-cols-[1fr_1.4fr_8rem_11rem_auto] sm:items-center sm:border-0 sm:p-0"
                 >
                   <Select
                     aria-label="เลือกจากสินค้า"
@@ -459,19 +526,19 @@ export function DocsPage() {
                     type="number"
                     inputMode="decimal"
                     min="0"
-                    step="0.01"
                     value={it.qty}
                     onChange={(e) => setItem(it.key, { qty: e.target.value })}
+                    className="text-right text-base tabular-nums"
                   />
                   <TextInput
                     aria-label="ราคาต่อหน่วย"
                     type="number"
                     inputMode="decimal"
                     min="0"
-                    step="0.01"
                     value={it.price}
-                    onChange={(e) => setItem(it.key, { price: e.target.value })}
+                    disabled
                     placeholder="ราคา"
+                    className="text-right text-base tabular-nums"
                   />
                   <button
                     type="button"
@@ -574,8 +641,7 @@ export function DocsPage() {
           </div>
         </div>
       </Modal>
-
-      {/* ---- ยืนยันลบ ---- */}
+      {/* ---- ยืนยันลบ ---- */}{" "}
       <Modal
         open={!!deleteFor}
         onClose={() => setDeleteFor(null)}
@@ -596,7 +662,6 @@ export function DocsPage() {
           เลขที่นี้จะไม่ถูกใช้ซ้ำ — เลขถัดไปเดินหน้าต่อเสมอ
         </p>
       </Modal>
-
       {/* ---- ข้อมูลร้าน (ใช้พิมพ์หัวเอกสาร) ---- */}
       <Modal
         open={shopOpen}
@@ -692,6 +757,41 @@ export function DocsPage() {
           </label>
         </div>
       </Modal>
+      {/* ---- ด่านใบกำกับภาษีเต็มรูป ---- */}
+      <Modal
+        open={!!gate}
+        onClose={() => setGate(null)}
+        title="ยังออกใบกำกับภาษีเต็มรูปไม่ได้"
+        hint="กฎหมายบังคับให้มีข้อมูลครบก่อน (ม.86/4)"
+        footer={
+          <Button variant="secondary" onClick={() => setGate(null)}>
+            เข้าใจแล้ว
+          </Button>
+        }
+      >
+        <ul className="space-y-1 text-sm text-danger">
+          {gate?.problems.map((p) => (
+            <li key={p}>• {p}</li>
+          ))}
+        </ul>
+        {gate && (
+          <Link
+            to={`/customers/${gate.doc.customer_id}`}
+            className="mt-3 inline-block text-sm text-accent hover:underline"
+          >
+            ไปแก้ข้อมูลลูกค้า →
+          </Link>
+        )}
+      </Modal>
+      {/* กระดาษ A4 รอพิมพ์ — ซ่อนนอกจอแทน display:none เพราะ clone ที่ถูกซ่อนจะออกกระดาษเปล่า */}
+      {printJob && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed top-0 -left-[9999px] print:hidden"
+        >
+          <DocPrintTemplate doc={printJob.doc} ref={printRef} />
+        </div>
+      )}
     </>
   );
 }

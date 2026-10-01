@@ -659,7 +659,6 @@ export function MoneyPage() {
                   type="number"
                   inputMode="decimal"
                   min="0"
-                  step="0.01"
                   value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: e.target.value })}
                   placeholder="0.00"
@@ -868,7 +867,6 @@ export function MoneyPage() {
                     type="number"
                     inputMode="decimal"
                     min="0"
-                    step="0.01"
                     value={settleAmount}
                     onChange={(e) => setSettleAmount(e.target.value)}
                   />

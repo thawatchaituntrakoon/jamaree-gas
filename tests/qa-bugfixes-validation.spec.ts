@@ -351,4 +351,78 @@ test.describe("ตรวจซ้ำตรรกะที่เพิ่งแ�
     await back.getByRole("button", { name: "บันทึก", exact: true }).click();
     await expect(back).toBeHidden({ timeout: 20_000 });
   });
+
+  // ------------------------------------------------------------------
+  test("6. ตั้งยอดยกมาถังเก็บใหญ่ — ตัวเลขบนการ์ดต้องขยับทันทีโดยไม่รีโหลด", async ({
+    page,
+  }) => {
+    test.skip(!RAW, `ไม่มีสินค้าชนิด "ดิบ" ในไฟล์ ${SOURCE_FILE}`);
+
+    await page.goto("/");
+    // ยอดกิโลบนการ์ด = <p> ถัดจากหัวข้อ "แก๊สในถังเก็บใหญ่" — ค่าเดียวกันกับที่ป้อนกราฟวงกลม
+    const amount = page.locator('p:text-is("แก๊สในถังเก็บใหญ่") + p');
+    const adjustBtn = page.getByRole("button", {
+      name: "ตั้งค่ายอดยกมา / ปรับปรุงสต๊อก",
+    });
+    await expect(amount, "ไม่เห็นตัวเลขแก๊สบนการ์ดถังเก็บใหญ่").toBeVisible({
+      timeout: 30_000,
+    });
+
+    const before = parseQty(await amount.innerText());
+    expect(before, "อ่านยอดแก๊สบนการ์ดไม่ออก").not.toBeNull();
+    const target = before! + 7;
+
+    /** เปิดฟอร์มปรับยอด กรอก แล้วบันทึก — ไม่รีโหลดหน้าระหว่างทาง */
+    async function setVolume(kg: number, reason: string) {
+      await adjustBtn.click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      await dialog.getByLabel("ยอดจริงในถัง (กิโล)").fill(String(kg));
+      await dialog.getByLabel("เหตุผล", { exact: true }).selectOption(reason);
+      await dialog.getByRole("button", { name: "บันทึก", exact: true }).click();
+      await expect(dialog).toBeHidden({ timeout: 20_000 });
+    }
+
+    await test.step("ยอดเท่าเดิมต้องบันทึกไม่ได้", async () => {
+      await adjustBtn.click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog.getByText("ยอดเท่าเดิม ไม่ต้องปรับ")).toBeVisible();
+      await expect(
+        dialog.getByRole("button", { name: "บันทึก", exact: true }),
+      ).toBeDisabled();
+      await dialog.getByRole("button", { name: "ยกเลิก", exact: true }).click();
+      await expect(dialog).toBeHidden();
+    });
+
+    await setVolume(target, "ยอดยกมาเริ่มต้น");
+
+    // ไม่มี page.reload() ตรงนี้โดยตั้งใจ — ต้องเห็นเลขใหม่จาก state ที่รีเฟรชเอง
+    await expect
+      .poll(async () => parseQty(await amount.innerText()), {
+        message:
+          "ตัวเลขบนการ์ดไม่ขยับทันทีหลังบันทึก (กราฟวงกลมใช้ค่าเดียวกัน)",
+        timeout: 15_000,
+      })
+      .toBe(target);
+
+    await test.step("มีรายการปรับสต๊อกไว้ตามรอยย้อนหลัง", async () => {
+      await page.goto("/products");
+      await page.getByLabel("ค้นหาสินค้า").fill(RAW!);
+      await page.getByRole("link", { name: RAW!, exact: true }).click();
+      const row = page
+        .getByRole("row")
+        .filter({ hasText: "ยอดยกมาเริ่มต้น" })
+        .first();
+      await expect(row, "ไม่เจอรายการปรับสต๊อกในประวัติสินค้า").toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(row.getByText("ปรับเพิ่ม")).toBeVisible();
+    });
+
+    // คืนสภาพ — ปรับกลับไปเท่าเดิม
+    await page.goto("/");
+    await expect(amount).toBeVisible({ timeout: 30_000 });
+    await setVolume(before!, "แก้ตัวเลขที่คีย์ผิด");
+    expect(parseQty(await amount.innerText())).toBe(before);
+  });
 });

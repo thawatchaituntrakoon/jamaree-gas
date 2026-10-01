@@ -11,6 +11,8 @@ interface ModalProps {
   /** แถวปุ่มด้านล่าง */
   footer?: ReactNode;
   wide?: boolean;
+  /** เต็มจอ — ใช้กับฟอร์มที่มีตารางรายการยาว ๆ */
+  full?: boolean;
 }
 
 export function Modal({
@@ -21,6 +23,7 @@ export function Modal({
   children,
   footer,
   wide,
+  full,
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -50,8 +53,10 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         className={[
-          "relative flex max-h-[92vh] w-full flex-col rounded-t-card bg-card shadow-pop sm:rounded-card",
-          wide ? "sm:max-w-3xl" : "sm:max-w-lg",
+          "relative flex w-full flex-col rounded-t-card bg-card shadow-pop sm:rounded-card",
+          full
+            ? "h-[96vh] max-h-[96vh] sm:w-[96vw] sm:max-w-none"
+            : `max-h-[92vh] ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`,
         ].join(" ")}
       >
         <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">

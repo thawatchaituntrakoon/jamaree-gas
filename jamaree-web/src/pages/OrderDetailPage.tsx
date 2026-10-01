@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Ban, Check, ChevronRight } from "lucide-react";
+import { Ban, Check, ChevronRight, Printer } from "lucide-react";
+import { useReactToPrint } from "react-to-print";
+import { OrderPrintTemplate } from "@/components/print/OrderPrintTemplate";
 import { Card, Section } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -70,6 +72,12 @@ export function OrderDetailPage() {
 
   const order = orders.find((o) => o.id === id);
 
+  const printRef = useRef<HTMLDivElement>(null);
+  const printOrder = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: order ? `บิล-${order.id.slice(0, 8).toUpperCase()}` : "บิล",
+  });
+
   if (!order) {
     return (
       <>
@@ -128,38 +136,47 @@ export function OrderDetailPage() {
         backTo="/orders"
         backLabel="กลับหน้าออเดอร์"
         action={
-          order.voided ? (
-            <Badge tone="danger">ยกเลิกแล้ว</Badge>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {canAdvance && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              icon={<Printer size={15} />}
+              onClick={() => printOrder()}
+            >
+              พิมพ์เอกสาร (Print A4)
+            </Button>
+            {order.voided ? (
+              <Badge tone="danger">ยกเลิกแล้ว</Badge>
+            ) : (
+              <>
+                {canAdvance && (
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => run(() => advanceOrderStage(order.id))}
+                  >
+                    ขั้นถัดไป
+                  </Button>
+                )}
+                {!order.stock_deducted && (
+                  <Button
+                    variant="ok"
+                    disabled={busy}
+                    onClick={() => run(() => completeOrder(order.id))}
+                  >
+                    {busy ? "กำลังปิดบิล…" : "ปิดบิล & ตัดสต๊อก"}
+                  </Button>
+                )}
                 <Button
-                  variant="secondary"
+                  variant="danger"
+                  icon={<Ban size={15} />}
                   disabled={busy}
-                  onClick={() => run(() => advanceOrderStage(order.id))}
+                  onClick={() => setConfirmVoid(true)}
                 >
-                  ขั้นถัดไป
+                  ยกเลิกบิล
                 </Button>
-              )}
-              {!order.stock_deducted && (
-                <Button
-                  variant="ok"
-                  disabled={busy}
-                  onClick={() => run(() => completeOrder(order.id))}
-                >
-                  {busy ? "กำลังปิดบิล…" : "ปิดบิล & ตัดสต๊อก"}
-                </Button>
-              )}
-              <Button
-                variant="danger"
-                icon={<Ban size={15} />}
-                disabled={busy}
-                onClick={() => setConfirmVoid(true)}
-              >
-                ยกเลิกบิล
-              </Button>
-            </div>
-          )
+              </>
+            )}
+          </div>
         }
       />
 
@@ -309,6 +326,14 @@ export function OrderDetailPage() {
           ตัวบิลจะยังอยู่ในประวัติ แค่ถูกทำเครื่องหมายว่ายกเลิกแล้ว
         </p>
       </Modal>
+
+      {/* กระดาษ A4 รอพิมพ์ — ซ่อนนอกจอแทน display:none เพราะ clone ที่ถูกซ่อนจะออกกระดาษเปล่า */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed top-0 -left-[9999px] print:hidden"
+      >
+        <OrderPrintTemplate order={order} ref={printRef} />
+      </div>
     </div>
   );
 }

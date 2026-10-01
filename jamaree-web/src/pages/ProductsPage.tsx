@@ -499,7 +499,6 @@ export function ProductsPage() {
                   id={id}
                   type="number"
                   min={0}
-                  step="0.01"
                   value={form.fill_kg ?? ""}
                   onChange={(e) =>
                     setForm({ ...form, fill_kg: Number(e.target.value) })
@@ -516,7 +515,6 @@ export function ProductsPage() {
                   id={id}
                   type="number"
                   min={0}
-                  step="0.01"
                   value={form.price ?? 0}
                   onChange={(e) =>
                     setForm({ ...form, price: Number(e.target.value) })
@@ -530,7 +528,6 @@ export function ProductsPage() {
                   id={id}
                   type="number"
                   min={0}
-                  step="0.01"
                   value={form.cost ?? ""}
                   onChange={(e) =>
                     setForm({
@@ -626,7 +623,6 @@ export function ProductsPage() {
                   id={id}
                   type="number"
                   min={0}
-                  step="0.01"
                   autoFocus
                   value={moveQty}
                   onChange={(e) => setMoveQty(e.target.value)}

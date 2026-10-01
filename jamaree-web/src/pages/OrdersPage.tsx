@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Ban, Eye, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ban, Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -38,6 +38,7 @@ export function OrdersPage() {
     priceFor,
     hasCustomPrice,
     customerName,
+    productById,
   } = useDerived();
   const saveOrder = useAppStore((s) => s.saveOrder);
   const voidOrder = useAppStore((s) => s.voidOrder);
@@ -47,6 +48,9 @@ export function OrdersPage() {
   const navigate = useNavigate();
 
   const [filter, setFilter] = useState<Filter>("ค้างส่ง");
+  const [query, setQuery] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Order | null>(null);
   const [voidFor, setVoidFor] = useState<Order | null>(null);
@@ -60,13 +64,32 @@ export function OrdersPage() {
 
   const sellable = useMemo(() => products.filter((p) => p.active), [products]);
 
-  const rows = useMemo(
-    () =>
-      filter === "ค้างส่ง"
-        ? orders.filter((o) => !o.stock_deducted && !o.voided)
-        : orders,
-    [orders, filter],
-  );
+  const filtered = !!query.trim() || !!from || !!to;
+
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (filter === "ค้างส่ง" && (o.stock_deducted || o.voided)) return false;
+      // o.date เป็น 'YYYY-MM-DD' เทียบเป็นสตริงตรง ๆ ได้เลย
+      if (from && o.date < from) return false;
+      if (to && o.date > to) return false;
+      if (!q) return true;
+      const hay = [
+        o.id.slice(0, 8),
+        customerName(o.customer_id),
+        ...o.items.map((it) => productById(it.product_id)?.name ?? ""),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [orders, filter, query, from, to, customerName, productById]);
+
+  function clearFilters() {
+    setQuery("");
+    setFrom("");
+    setTo("");
+  }
 
   const draftTotal = items.reduce((sum, it) => {
     if (!it.product_id) return sum;
@@ -164,31 +187,80 @@ export function OrdersPage() {
       />
 
       <Card>
-        <div className="flex gap-1 border-b border-line p-3">
-          {(["ค้างส่ง", "ทั้งหมด"] as Filter[]).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={[
-                "rounded-btn px-3 py-1.5 text-sm font-medium transition-colors",
-                filter === f
-                  ? "bg-accent-soft text-accent"
-                  : "text-muted hover:bg-paper",
-              ].join(" ")}
+        <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
+          <div className="flex gap-1">
+            {(["ค้างส่ง", "ทั้งหมด"] as Filter[]).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={[
+                  "rounded-btn px-3 py-1.5 text-sm font-medium transition-colors",
+                  filter === f
+                    ? "bg-accent-soft text-accent"
+                    : "text-muted hover:bg-paper",
+                ].join(" ")}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative min-w-52 flex-1">
+            <Search
+              size={16}
+              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted"
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="ค้นหาชื่อลูกค้า เลขที่บิล หรือชื่อสินค้า"
+              aria-label="ค้นหาบิล"
+              className="w-full rounded-btn border border-line bg-card py-2 pr-3 pl-9 text-sm focus:border-accent focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <TextInput
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => setFrom(e.target.value)}
+              aria-label="ตั้งแต่วันที่"
+              className="w-[9.5rem]!"
+            />
+            <span className="text-sm text-muted">ถึง</span>
+            <TextInput
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => setTo(e.target.value)}
+              aria-label="ถึงวันที่"
+              className="w-[9.5rem]!"
+            />
+          </div>
+
+          {filtered && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<X size={14} />}
+              onClick={clearFilters}
             >
-              {f}
-            </button>
-          ))}
+              ล้างตัวกรอง
+            </Button>
+          )}
         </div>
 
         <DataTable<Order>
           rows={rows}
           rowKey={(o) => o.id}
           empty={
-            orders.length
-              ? "ไม่มีบิลค้างส่ง สบายใจได้"
-              : "ยังไม่มีบิล กดปุ่ม “เปิดบิลใหม่” เพื่อขายชิ้นแรก"
+            !orders.length
+              ? "ยังไม่มีบิล กดปุ่ม “เปิดบิลใหม่” เพื่อขายชิ้นแรก"
+              : filtered
+                ? "ไม่พบบิลตามเงื่อนไขที่ค้นหา"
+                : "ไม่มีบิลค้างส่ง สบายใจได้"
           }
           columns={[
             {
@@ -278,7 +350,7 @@ export function OrdersPage() {
       </Card>
 
       <Modal
-        wide
+        full
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? "แก้ไขบิล" : "เปิดบิลใหม่"}
@@ -330,7 +402,12 @@ export function OrdersPage() {
           </div>
 
           <div>
-            <p className="mb-1.5 text-sm font-medium text-ink">รายการสินค้า</p>
+            <div className="mb-1.5 flex items-center gap-2 text-xs font-medium text-muted">
+              <span className="min-w-0 flex-1">สินค้า</span>
+              <span className="w-28 text-right">จำนวน</span>
+              <span className="w-32 text-right">จำนวนเงิน</span>
+              <span className="w-9" />
+            </div>
             <div className="space-y-2">
               {items.map((it, idx) => (
                 <div key={it.key} className="flex items-center gap-2">
@@ -346,7 +423,7 @@ export function OrdersPage() {
                         ),
                       )
                     }
-                    className="min-w-0 flex-1 rounded-btn border border-line bg-card px-3 py-2 text-sm focus:border-accent focus:outline-none"
+                    className="min-w-0 flex-1 rounded-btn border border-line bg-card px-3 py-2 text-base focus:border-accent focus:outline-none"
                   >
                     <option value="">— เลือกสินค้า —</option>
                     {sellable.map((p) => (
@@ -371,16 +448,16 @@ export function OrdersPage() {
                         ),
                       )
                     }
-                    className="w-20 rounded-btn border border-line bg-card px-3 py-2 text-right text-sm focus:border-accent focus:outline-none"
+                    className="w-28 rounded-btn border border-line bg-card px-3 py-2 text-right text-base tabular-nums focus:border-accent focus:outline-none"
                   />
-                  <span className="w-24 text-right text-sm tabular-nums text-muted">
+                  <span className="w-32 text-right text-base tabular-nums text-ink">
                     {it.product_id ? (
                       <>
                         {fmtBaht(
                           priceFor(it.product_id, customerId || null) *
                             Number(it.qty || 0),
                         )}
-                        <span className="block text-xs">
+                        <span className="block text-xs text-muted">
                           @
                           {fmtBaht(priceFor(it.product_id, customerId || null))}
                           {hasCustomPrice(
@@ -390,7 +467,7 @@ export function OrdersPage() {
                         </span>
                       </>
                     ) : (
-                      "—"
+                      <span className="text-muted">—</span>
                     )}
                   </span>
                   <button
@@ -403,7 +480,7 @@ export function OrdersPage() {
                           : [newItem()],
                       )
                     }
-                    className="rounded-btn p-2 text-muted hover:bg-danger-soft hover:text-danger"
+                    className="w-9 shrink-0 rounded-btn p-2 text-muted hover:bg-danger-soft hover:text-danger"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -428,7 +505,6 @@ export function OrdersPage() {
                   id={id}
                   type="number"
                   min={0}
-                  step="0.01"
                   value={cash}
                   onChange={(e) => setCash(e.target.value)}
                 />
@@ -440,7 +516,6 @@ export function OrdersPage() {
                   id={id}
                   type="number"
                   min={0}
-                  step="0.01"
                   value={transfer}
                   onChange={(e) => setTransfer(e.target.value)}
                 />

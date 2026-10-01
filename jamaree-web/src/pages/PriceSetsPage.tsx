@@ -386,7 +386,6 @@ export function PriceSetsPage() {
                       <TextInput
                         type="number"
                         min={0}
-                        step="0.01"
                         aria-label={`ราคาของ ${p?.name ?? ""}`}
                         value={row.price}
                         onChange={(e) =>

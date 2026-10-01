@@ -172,6 +172,15 @@ interface AppState {
   /** ⭐ ทางเดียวที่สต๊อกจะขยับได้ — เรียกฟังก์ชัน add_move() ในฐานข้อมูล */
   addMove: (input: MoveInput) => Promise<InventoryMove>;
 
+  /**
+   * ตั้งยอดแก๊สในถังเก็บใหญ่ให้ตรงกับของจริง (ยอดยกมา/ตรวจวัด)
+   * ส่วนต่างกลายเป็นรายการ ปรับเพิ่ม/ปรับลด — คืน null ถ้ายอดเท่าเดิม
+   */
+  adjustBulkTankStock: (
+    newKg: number,
+    reason: string,
+  ) => Promise<InventoryMove | null>;
+
   /** ⭐ ปิดออเดอร์ = ตัดสต๊อก + ลงบัญชี ในทีเดียว (ฟังก์ชัน complete_order) */
   completeOrder: (id: UUID) => Promise<void>;
   /** ยกเลิกบิล — คืนสต๊อก + ล้างยอดเงินของบิลนั้น (ไม่ลบออเดอร์) */
@@ -1177,6 +1186,27 @@ export const useAppStore = create<AppState>()((set, get) => ({
     // สต๊อกเปลี่ยนแล้ว — ดึงสินค้ามาใหม่ให้ตัวเลขบนหน้าจอตรงกับฐานข้อมูล
     await get().reloadProducts();
     return row;
+  },
+
+  adjustBulkTankStock: async (newKg, reason) => {
+    const raw = get().products.find((p) => p.kind === "ดิบ");
+    if (!raw) {
+      const message =
+        "ยังไม่มีสินค้าชนิด “ดิบ” ในระบบ — สร้างแก๊สดิบ (ถังเก็บใหญ่) ก่อน";
+      set({ error: message });
+      throw new Error(message);
+    }
+
+    const diff = newKg - Number(raw.stock);
+    if (diff === 0) return null;
+
+    // ห้ามเขียนทับ stock ตรง ๆ — ยิงส่วนต่างผ่าน add_move() ให้ฐานข้อมูลอัปเดตสต๊อกพร้อมเขียน audit log
+    return get().addMove({
+      product_id: raw.id,
+      type: diff > 0 ? "ปรับเพิ่ม" : "ปรับลด",
+      qty: Math.abs(diff),
+      note: reason.trim() || "ปรับปรุงยอดถังเก็บใหญ่",
+    });
   },
 
   completeOrder: async (id) => {

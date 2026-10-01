@@ -1,5 +1,16 @@
-import { useMemo, useState } from "react";
-import { Ban, Pencil, Plus, Send, Trash2, Truck, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Ban,
+  Pencil,
+  Plus,
+  Printer,
+  Send,
+  Trash2,
+  Truck,
+  X,
+} from "lucide-react";
+import { useReactToPrint } from "react-to-print";
+import { POPrintTemplate } from "@/components/print/POPrintTemplate";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -52,6 +63,26 @@ export function PurchasesPage() {
 
   const [tab, setTab] = useState<Tab>("po");
   const [busy, setBusy] = useState(false);
+
+  // n = ตีตราเวลา บังคับให้ state เปลี่ยนจริงทุกครั้งที่กดพิมพ์ แม้เป็นใบเดิม
+  const [printJob, setPrintJob] = useState<{
+    po: PurchaseOrder;
+    n: number;
+  } | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const printTitle = useRef("ใบสั่งซื้อ");
+  const docTitle = useCallback(() => printTitle.current, []);
+  const clearPrintJob = useCallback(() => setPrintJob(null), []);
+  const printPo = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: docTitle,
+    onAfterPrint: clearPrintJob,
+  });
+
+  // ต้องรอให้เทมเพลตลงจอก่อน ไลบรารีถึงจะ clone ไปหน้าต่างพิมพ์ได้
+  useEffect(() => {
+    if (printJob) printPo();
+  }, [printJob, printPo]);
 
   const [poOpen, setPoOpen] = useState(false);
   const [editing, setEditing] = useState<PurchaseOrder | null>(null);
@@ -352,6 +383,17 @@ export function PurchasesPage() {
                 align: "right",
                 cell: (p) => (
                   <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<Printer size={14} />}
+                      onClick={() => {
+                        printTitle.current = p.number;
+                        setPrintJob({ po: p, n: Date.now() });
+                      }}
+                    >
+                      พิมพ์ A4
+                    </Button>
                     {p.status === "ร่าง" && (
                       <>
                         <Button
@@ -467,6 +509,16 @@ export function PurchasesPage() {
         )}
       </Card>
 
+      {/* กระดาษ A4 รอพิมพ์ — ซ่อนนอกจอแทน display:none เพราะ clone ที่ถูกซ่อนจะออกกระดาษเปล่า */}
+      {printJob && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed top-0 -left-[9999px] print:hidden"
+        >
+          <POPrintTemplate po={printJob.po} ref={printRef} />
+        </div>
+      )}
+
       {/* ---- ฟอร์มใบสั่งซื้อ ---- */}
       <Modal
         wide
@@ -553,7 +605,6 @@ export function PurchasesPage() {
                     type="number"
                     inputMode="decimal"
                     min="0"
-                    step="0.01"
                     value={it.qty}
                     onChange={(e) => setItem(it.key, { qty: e.target.value })}
                   />
@@ -562,7 +613,6 @@ export function PurchasesPage() {
                     type="number"
                     inputMode="decimal"
                     min="0"
-                    step="0.01"
                     value={it.price}
                     onChange={(e) => setItem(it.key, { price: e.target.value })}
                     placeholder="ราคาทุน"
@@ -662,7 +712,6 @@ export function PurchasesPage() {
                 type="number"
                 inputMode="decimal"
                 min="0"
-                step="0.01"
                 value={it.qty}
                 onChange={(e) =>
                   setReceived((list) =>
@@ -677,7 +726,6 @@ export function PurchasesPage() {
                 type="number"
                 inputMode="decimal"
                 min="0"
-                step="0.01"
                 value={it.price}
                 onChange={(e) =>
                   setReceived((list) =>

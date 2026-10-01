@@ -185,7 +185,14 @@
     color: #000;
   }
 
+  /* เส้นตาราง/พื้นหลังอ่อนต้องติดกระดาษด้วย ไม่งั้นเอกสารจะเหลือแต่ตัวหนังสือลอย ๆ */
+  .print-area * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
   @page {
+    size: A4;
     margin: 14mm;
   }
 }
