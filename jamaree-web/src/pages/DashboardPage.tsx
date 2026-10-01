@@ -17,7 +17,15 @@ import { DataTable } from "@/components/ui/DataTable";
 import { BulkTankStatus } from "@/components/dashboard/BulkTankStatus";
 import { fmtBaht, fmtDate, fmtQty, workStageTone } from "@/lib/constants";
 import { useDerived } from "@/lib/useDerived";
-import type { Order, Product } from "@/types";
+import { roleAllowed, useAuthStore } from "@/store/useAuthStore";
+import type { AccessRole, Order, Product } from "@/types";
+
+/** ตัวเลขเงินและต้นทุน — พนักงานหน้างานไม่ต้องเห็น */
+const MONEY_ROLES: readonly AccessRole[] = [
+  "SUPER_ADMIN",
+  "MANAGER",
+  "FINANCE",
+];
 
 interface StatCardProps {
   label: string;
@@ -103,6 +111,9 @@ export function DashboardPage() {
     staffName,
   } = useDerived();
 
+  const role = useAuthStore((s) => s.simulatedRole ?? s.role);
+  const canSeeMoney = roleAllowed(role, MONEY_ROLES);
+
   const hasAnything = customers.length > 0 || orders.length > 0;
 
   return (
@@ -180,37 +191,39 @@ export function DashboardPage() {
       </div>
 
       {/* ---- ตัวเลขไว้ดูเฉย ๆ ---- */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MiniStat
-          label="มูลค่าของในคลัง"
-          value={`${fmtBaht(stockValue.total)} บาท`}
-          hint={
-            stockValue.noCostCount
-              ? `ยังไม่ใส่ทุน ${stockValue.noCostCount} รายการ`
-              : "คิดจากราคาทุน"
-          }
-          to="/products"
-        />
-        <MiniStat
-          label="เงินเข้าเดือนนี้"
-          value={`${fmtBaht(monthIn)} บาท`}
-          tone="text-ok"
-          to="/money"
-        />
-        <MiniStat
-          label="เงินออกเดือนนี้"
-          value={`${fmtBaht(monthOut)} บาท`}
-          tone="text-danger"
-          to="/money"
-        />
-        <MiniStat
-          label="กำไรเดือนนี้"
-          value={`${fmtBaht(monthProfit)} บาท`}
-          hint={`ถังอยู่กับลูกค้า ${fmtQty(cylinderTotals.atCustomer)} ใบ · มัดจำ ${fmtBaht(depositHeld)} บาท`}
-          tone={monthProfit >= 0 ? "text-ok" : "text-danger"}
-          to="/reports"
-        />
-      </div>
+      {canSeeMoney && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MiniStat
+            label="มูลค่าของในคลัง"
+            value={`${fmtBaht(stockValue.total)} บาท`}
+            hint={
+              stockValue.noCostCount
+                ? `ยังไม่ใส่ทุน ${stockValue.noCostCount} รายการ`
+                : "คิดจากราคาทุน"
+            }
+            to="/products"
+          />
+          <MiniStat
+            label="เงินเข้าเดือนนี้"
+            value={`${fmtBaht(monthIn)} บาท`}
+            tone="text-ok"
+            to="/money"
+          />
+          <MiniStat
+            label="เงินออกเดือนนี้"
+            value={`${fmtBaht(monthOut)} บาท`}
+            tone="text-danger"
+            to="/money"
+          />
+          <MiniStat
+            label="กำไรเดือนนี้"
+            value={`${fmtBaht(monthProfit)} บาท`}
+            hint={`ถังอยู่กับลูกค้า ${fmtQty(cylinderTotals.atCustomer)} ใบ · มัดจำ ${fmtBaht(depositHeld)} บาท`}
+            tone={monthProfit >= 0 ? "text-ok" : "text-danger"}
+            to="/reports"
+          />
+        </div>
+      )}
 
       <BulkTankStatus />
 

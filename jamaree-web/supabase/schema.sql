@@ -2419,14 +2419,22 @@ begin
     raise exception 'ออเดอร์นี้ยังไม่มีรายการสินค้า';
   end if;
 
-  -- 0) ถังใหม่ทุกบรรทัดต้องรู้ว่าบรรจุกี่กิโล ไม่งั้นแก๊สจะหายจากบัญชี
+  -- 0) ทุกบรรทัดที่ต้องดึงแก๊สจากถังเก็บใหญ่ ต้องรู้ว่าบรรจุกี่กิโล ไม่งั้นแก๊สจะหายจากบัญชี
+  --    • ถังใหม่ → บรรจุตอนขายเสมอ
+  --    • น้ำแก๊ส/ถังหมุนเวียน → เฉพาะไซส์ที่ยังไม่มี "ถังเต็ม" ให้ตัด (ต้องดูดจากถังเก็บใหญ่)
   select p.name as name
     into v_short
     from public.order_items oi
     join public.products p on p.id = oi.product_id
    where oi.order_id = p_order_id
-     and p.kind = 'ใหม่'
-     and coalesce(public.cyl_fill_kg(p.size, p.fill_kg), 0) <= 0
+     and (
+       (p.kind = 'ใหม่'
+         and coalesce(public.cyl_fill_kg(p.size, p.fill_kg), 0) <= 0)
+       or
+       (p.kind in ('น้ำแก๊ส', 'หมุนเวียน')
+         and public.full_cyl_id(p.size) is null
+         and coalesce(p.fill_kg, 0) <= 0)
+     )
    limit 1;
   if found then
     raise exception 'ยังไม่รู้ว่า "%" บรรจุแก๊สกี่กิโล — ใส่ขนาดถัง (เช่น 15kg) ที่ทะเบียนสินค้าก่อน',

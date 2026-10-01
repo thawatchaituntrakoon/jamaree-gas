@@ -17,6 +17,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import { DamagedCylinderModal } from "@/components/pos/DamagedCylinderModal";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ProductThumb } from "@/components/ui/ProductThumb";
@@ -108,6 +109,7 @@ export function PosPage() {
   const [term, setTerm] = useState("");
   const [pickCustomer, setPickCustomer] = useState(false);
   const [clearBills, setClearBills] = useState(false);
+  const [damaged, setDamaged] = useState(false);
   // ข้อความลอย — เก็บ nonce ไว้ให้เตือนซ้ำข้อความเดิมแล้วนับเวลาใหม่ได้
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
@@ -304,6 +306,15 @@ export function PosPage() {
             {settings?.shop_name ?? "JAMAREE GAS"}
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setDamaged(true)}
+          className={`${TAP} inline-flex items-center gap-2 rounded-btn border border-line px-3 py-2 text-sm hover:bg-paper`}
+        >
+          <AlertTriangle size={16} className="shrink-0 text-warn" />
+          <span className="text-ink max-sm:sr-only">ถังชำรุด</span>
+        </button>
 
         <button
           type="button"
@@ -621,6 +632,8 @@ export function PosPage() {
           onSettle={settleTransaction}
         />
       )}
+
+      {damaged && <DamagedCylinderModal onClose={() => setDamaged(false)} />}
 
       <ReceiptModal
         key={receipt?.orderId}

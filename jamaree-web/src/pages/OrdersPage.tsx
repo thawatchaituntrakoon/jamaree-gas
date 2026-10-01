@@ -1,6 +1,17 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Ban, Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { useReactToPrint } from "react-to-print";
+import {
+  Ban,
+  Eye,
+  Pencil,
+  Plus,
+  Printer,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import { OrderPairPrintTemplate } from "@/components/print/OrderPairPrintTemplate";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -55,6 +66,25 @@ export function OrdersPage() {
   const [editing, setEditing] = useState<Order | null>(null);
   const [voidFor, setVoidFor] = useState<Order | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // พิมพ์ใบส่งของ+บิลคู่กันบนกระดาษ A4 แผ่นเดียว — n ไว้บังคับให้พิมพ์ซ้ำบิลเดิมได้
+  const [printJob, setPrintJob] = useState<{ order: Order; n: number } | null>(
+    null,
+  );
+  const printRef = useRef<HTMLDivElement>(null);
+  const clearPrintJob = useCallback(() => setPrintJob(null), []);
+  const printTitle = useCallback(
+    () => `ใบส่งของ-บิล-${printJob?.order.id.slice(0, 8).toUpperCase() ?? ""}`,
+    [printJob],
+  );
+  const printPair = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printTitle(),
+    onAfterPrint: clearPrintJob,
+  });
+  useEffect(() => {
+    if (printJob) printPair();
+  }, [printJob, printPair]);
 
   const [customerId, setCustomerId] = useState<UUID | "">("");
   const [date, setDate] = useState(todayStr());
@@ -332,6 +362,14 @@ export function OrdersPage() {
                   >
                     ดูรายละเอียด
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<Printer size={14} />}
+                    onClick={() => setPrintJob({ order: o, n: Date.now() })}
+                  >
+                    พิมพ์ใบส่งของ+บิล
+                  </Button>
                   {canVoid && o.stock_deducted && !o.voided && (
                     <Button
                       variant="danger"
@@ -570,6 +608,16 @@ export function OrdersPage() {
           ตัวบิลจะยังอยู่ในประวัติ แค่ถูกทำเครื่องหมายว่ายกเลิกแล้ว
         </p>
       </Modal>
+
+      {/* กระดาษที่จะพิมพ์ — ซ่อนออกไปนอกจอ ไม่ใช่ display:none เพราะตัวพิมพ์ต้องวัดขนาดได้ */}
+      {printJob && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed top-0 -left-[9999px] print:hidden"
+        >
+          <OrderPairPrintTemplate order={printJob.order} ref={printRef} />
+        </div>
+      )}
     </>
   );
 }

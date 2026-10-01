@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Ban, Check, ChevronRight, Printer } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
+import { OrderPairPrintTemplate } from "@/components/print/OrderPairPrintTemplate";
 import { OrderPrintTemplate } from "@/components/print/OrderPrintTemplate";
 import { Card, Section } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -78,6 +79,15 @@ export function OrderDetailPage() {
     documentTitle: order ? `บิล-${order.id.slice(0, 8).toUpperCase()}` : "บิล",
   });
 
+  // ใบส่งของ + บิล อย่างละใบบนกระดาษ A4 แผ่นเดียว (ครึ่งบน/ครึ่งล่าง)
+  const pairRef = useRef<HTMLDivElement>(null);
+  const printPair = useReactToPrint({
+    contentRef: pairRef,
+    documentTitle: order
+      ? `ใบส่งของ-บิล-${order.id.slice(0, 8).toUpperCase()}`
+      : "ใบส่งของ-บิล",
+  });
+
   if (!order) {
     return (
       <>
@@ -143,6 +153,13 @@ export function OrderDetailPage() {
               onClick={() => printOrder()}
             >
               พิมพ์เอกสาร (Print A4)
+            </Button>
+            <Button
+              variant="secondary"
+              icon={<Printer size={15} />}
+              onClick={() => printPair()}
+            >
+              พิมพ์ใบส่งของ+บิล (A4 แผ่นเดียว)
             </Button>
             {order.voided ? (
               <Badge tone="danger">ยกเลิกแล้ว</Badge>
@@ -333,6 +350,7 @@ export function OrderDetailPage() {
         className="pointer-events-none fixed top-0 -left-[9999px] print:hidden"
       >
         <OrderPrintTemplate order={order} ref={printRef} />
+        <OrderPairPrintTemplate order={order} ref={pairRef} />
       </div>
     </div>
   );
