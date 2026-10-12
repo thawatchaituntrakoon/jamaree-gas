@@ -7,6 +7,41 @@ services:
         # อ่านจากไฟล์ .env ที่วางไว้ข้าง ๆ docker-compose.yml บนเซิร์ฟเวอร์
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    expose:
+      - "80"
+    restart: unless-stopped
+
+  # ตัวรับหน้าบ้าน + ขอ/ต่ออายุใบรับรอง Let's Encrypt ให้เองอัตโนมัติ
+  caddy:
+    image: caddy:2-alpine
+    container_name: jamaree-caddy
+    depends_on:
+      - jamaree-frontend
+    environment:
+      # ไม่ได้ตั้ง DOMAIN = เปิดแบบ http ธรรมดา (เข้าผ่านไอพีได้เหมือนเดิม)
+      SITE_ADDRESS: ${DOMAIN:-:80}
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # ใบรับรองต้องอยู่ข้ามการรีสตาร์ต ไม่งั้นจะขอใหม่ทุกครั้งจนโดน Let's Encrypt จำกัดโควตา
+      - caddy_data:/data
+      - caddy_config:/config
     restart: unless-stopped
+
+  # ไอพีของ VPS นิ่งอยู่แล้วก็ไม่ต้องใช้ตัวนี้ — เปิดเมื่อไอพีเปลี่ยนเองเท่านั้น
+  # docker compose --profile duckdns --env-file .env.local up -d
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: jamaree-duckdns
+    profiles: ["duckdns"]
+    environment:
+      SUBDOMAINS: ${DUCKDNS_SUBDOMAINS:-}
+      TOKEN: ${DUCKDNS_TOKEN:-}
+      TZ: Asia/Bangkok
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

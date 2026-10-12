@@ -1,0 +1,6 @@
+project_id = "wvhhmdpjjgdqzzwitbdd"
+
+# ฟังก์ชันตรวจ Authorization header + สิทธิ์เองอยู่แล้ว (ดู index.ts)
+# ปิด verify_jwt ของเกตเวย์ไว้ ไม่งั้น preflight (OPTIONS) จากเบราว์เซอร์จะโดนตีกลับ 401
+[functions.admin-users]
+verify_jwt = false
