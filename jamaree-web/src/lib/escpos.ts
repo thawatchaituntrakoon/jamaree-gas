@@ -86,7 +86,13 @@ function thaiDate(iso: string): string {
   }).format(d);
 }
 
-/** สร้างไบต์ ESC/POS ของใบเสร็จทั้งใบ */
+/**
+ * สร้างไบต์ ESC/POS ของใบเสร็จทั้งใบ แบบ "ตัวอักษรดิบ" (ทางสำรอง)
+ *
+ * ⚠️ หน้าขายใช้ buildReceiptRasterBytes() ใน escposRaster.ts แทนแล้ว
+ * ทางนี้ใช้ได้เฉพาะเครื่องที่ยืนยันแล้วว่ามีฟอนต์ไทยในเฟิร์มแวร์ และรู้เลขรหัสหน้าไทยที่ถูกต้อง
+ * (ส่ง codepage ให้ตรงกับเครื่องเสมอ ห้ามเดา — เดาผิดจะได้ตัวประหลาดทั้งใบ)
+ */
 export function buildReceiptBytes(
   receipt: PosReceipt,
   { cols = PAPER_COLS["58mm"], codepage = 255 }: PrintOptions = {},

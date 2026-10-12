@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -35,7 +35,10 @@ import {
   fmtQty,
   todayStr,
 } from "@/lib/constants";
-import { buildReceiptBytes } from "@/lib/escpos";
+import {
+  buildReceiptRasterBytes,
+  buildThaiTestBytes,
+} from "@/lib/escposRaster";
 import type { PosReceipt } from "@/lib/escpos";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useDerived } from "@/lib/useDerived";
@@ -148,6 +151,7 @@ export function PosPage() {
   const [clearBills, setClearBills] = useState(false);
   const [damaged, setDamaged] = useState(false);
   const [newProduct, setNewProduct] = useState(false);
+  const [testPrinting, setTestPrinting] = useState(false);
   // ข้อความลอย — เก็บ nonce ไว้ให้เตือนซ้ำข้อความเดิมแล้วนับเวลาใหม่ได้
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
@@ -246,6 +250,20 @@ export function PosPage() {
       id: Date.now(),
       text: `ปรับราคาตามชุดราคาของ ${who} แล้ว — ยอดรวม ${fmtBaht(before)} → ${fmtBaht(after)} บาท`,
     });
+  }
+
+  /** หน้าทดสอบภาษาไทย — ไว้เช็คสระ/วรรณยุกต์กับเครื่องพิมพ์จริง */
+  async function testPrint() {
+    if (testPrinting) return;
+    setTestPrinting(true);
+    try {
+      await printBytes(await buildThaiTestBytes());
+      setToast({ id: Date.now(), text: "ส่งหน้าทดสอบไปที่เครื่องพิมพ์แล้ว" });
+    } catch (err) {
+      setToast({ id: Date.now(), text: printErrorMessage(err) });
+    } finally {
+      setTestPrinting(false);
+    }
   }
 
   const openBills = useMemo<OpenBill[]>(() => {
@@ -362,6 +380,23 @@ export function PosPage() {
           <AlertTriangle size={16} className="shrink-0 text-warn" />
           <span className="text-ink max-sm:sr-only">ถังชำรุด</span>
         </button>
+
+        {bluetoothPrintSupported && (
+          <button
+            type="button"
+            onClick={() => void testPrint()}
+            disabled={testPrinting}
+            title="ทดสอบพิมพ์ภาษาไทย"
+            className={`${TAP} inline-flex items-center gap-2 rounded-btn border border-line px-3 py-2 text-sm hover:bg-paper disabled:opacity-60`}
+          >
+            {testPrinting ? (
+              <Loader2 size={16} className="shrink-0 animate-spin text-muted" />
+            ) : (
+              <Printer size={16} className="shrink-0 text-muted" />
+            )}
+            <span className="text-ink max-sm:sr-only">ทดสอบพิมพ์</span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -1080,19 +1115,23 @@ function ReceiptModal({
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
   const [printed, setPrinted] = useState(false);
+  // กันกดรัว ๆ แล้วส่งงานพิมพ์ซ้ำ — state ของ React อัปเดตช้ากว่าปลายนิ้ว
+  const sending = useRef(false);
 
   if (!receipt) return null;
 
   async function print() {
-    if (!receipt) return;
+    if (!receipt || sending.current) return;
+    sending.current = true;
     setPrinting(true);
     setPrintError(null);
     try {
-      await printBytes(buildReceiptBytes(receipt));
+      await printBytes(await buildReceiptRasterBytes(receipt));
       setPrinted(true);
     } catch (err) {
       setPrintError(printErrorMessage(err));
     } finally {
+      sending.current = false;
       setPrinting(false);
     }
   }
