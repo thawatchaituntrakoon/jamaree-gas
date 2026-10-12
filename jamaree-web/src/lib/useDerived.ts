@@ -351,18 +351,25 @@ export function useDerived() {
       }, 0);
 
     /** ยอดแก๊สที่ขายจริง — นับเฉพาะบิลที่ปิดแล้ว ยังไม่ปิดถือว่ายังไม่ออกจากร้าน */
-    const gasKgSold = orders.reduce(
-      (acc, o) => {
-        if (!o.stock_deducted || o.voided) return acc;
-        const kg = orderGasKg(o);
-        const date = String(o.date);
-        return {
-          today: acc.today + (date === todayISO ? kg : 0),
-          month: acc.month + (date.slice(0, 7) === thisMonth ? kg : 0),
-        };
-      },
-      { today: 0, month: 0 },
-    );
+    const gasKgByDay = new Map<string, number>();
+    for (const o of orders) {
+      if (!o.stock_deducted || o.voided) continue;
+      const kg = orderGasKg(o);
+      if (!kg) continue;
+      const date = String(o.date);
+      gasKgByDay.set(date, (gasKgByDay.get(date) ?? 0) + kg);
+    }
+
+    const gasKgMonth = [...gasKgByDay.entries()]
+      .filter(([date]) => date.slice(0, 7) === thisMonth)
+      .reduce((sum, [, kg]) => sum + kg, 0);
+
+    const gasKgSold = {
+      today: gasKgByDay.get(todayISO) ?? 0,
+      month: gasKgMonth,
+      // เฉลี่ยจากวันที่ผ่านมาแล้วเท่านั้น ไม่หารด้วยวันที่ยังมาไม่ถึง
+      avgPerDay: gasKgMonth / Math.max(1, Number(todayISO.slice(8, 10))),
+    };
 
     /* ---------- มูลค่าของในคลัง ---------- */
 

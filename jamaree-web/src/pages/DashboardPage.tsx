@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle,
+  CalendarDays,
   ClipboardList,
   Cylinder,
   FileText,
@@ -163,14 +164,18 @@ export function DashboardPage() {
           to="/tanks"
         />
         <StatCard
+          label="แก๊สที่ขายวันนี้"
+          value={`${fmtQty(gasKgSold.today)} กก.`}
+          hint={`เฉลี่ยวันละ ${fmtQty(gasKgSold.avgPerDay)} กก. เดือนนี้`}
+          icon={<Flame size={17} />}
+          tone="accent"
+          to="/orders"
+        />
+        <StatCard
           label="แก๊สที่ขายเดือนนี้"
           value={`${fmtQty(gasKgSold.month)} กก.`}
-          hint={
-            gasKgSold.today > 0
-              ? `วันนี้ ${fmtQty(gasKgSold.today)} กก.`
-              : "วันนี้ยังไม่มีบิลปิด"
-          }
-          icon={<Flame size={17} />}
+          hint="นับเฉพาะบิลที่ปิดแล้ว"
+          icon={<CalendarDays size={17} />}
           tone="accent"
           to="/orders"
         />
