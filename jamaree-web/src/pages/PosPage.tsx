@@ -583,9 +583,10 @@ export function PosPage() {
                       >
                         <Minus size={16} />
                       </StepBtn>
-                      <span className="w-10 text-center text-sm font-semibold text-ink">
-                        {fmtQty(l.qty)}
-                      </span>
+                      <QtyInput
+                        qty={l.qty}
+                        onCommit={(n) => updateQuantity(l.product_id, n)}
+                      />
                       <StepBtn
                         label="เพิ่มจำนวน"
                         onClick={() => updateQuantity(l.product_id, l.qty + 1)}
@@ -1257,6 +1258,48 @@ function StepBtn({
     >
       {children}
     </button>
+  );
+}
+
+function QtyInput({
+  qty,
+  onCommit,
+}: {
+  qty: number;
+  onCommit: (qty: number) => void;
+}) {
+  // เก็บค่าที่พิมพ์ไว้ต่างหาก จะได้ลบให้ว่างระหว่างพิมพ์ได้โดยไม่โดนเด้งออกจากตะกร้า
+  const [draft, setDraft] = useState(String(qty));
+
+  useEffect(() => setDraft(String(qty)), [qty]);
+
+  function commit(text: string) {
+    const n = Math.floor(Number(text));
+    if (text.trim() !== "" && Number.isFinite(n) && n > 0) onCommit(n);
+  }
+
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={1}
+      step={1}
+      value={draft}
+      aria-label="จำนวน"
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        commit(e.target.value);
+      }}
+      onBlur={(e) => {
+        commit(e.target.value);
+        setDraft(String(qty));
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+      className={`${TAP} h-10 w-16 rounded-btn border border-line bg-card text-center text-sm font-semibold text-ink focus:border-accent focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+    />
   );
 }
 
