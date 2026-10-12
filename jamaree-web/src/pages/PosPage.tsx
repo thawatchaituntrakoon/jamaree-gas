@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Loader2,
   Minus,
+  PackagePlus,
   Plus,
   Printer,
   Search,
@@ -21,20 +22,32 @@ import { DamagedCylinderModal } from "@/components/pos/DamagedCylinderModal";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { ProductThumb } from "@/components/ui/ProductThumb";
-import { TextInput } from "@/components/ui/Field";
+import { Field, Select, TextInput } from "@/components/ui/Field";
 import {
   bluetoothPrintSupported,
   printBytes,
   printErrorMessage,
 } from "@/lib/bluetoothPrinter";
-import { GAS_FILL_KINDS, fmtBaht, fmtQty, todayStr } from "@/lib/constants";
+import {
+  GAS_FILL_KINDS,
+  PRODUCT_KINDS,
+  fmtBaht,
+  fmtQty,
+  todayStr,
+} from "@/lib/constants";
 import { buildReceiptBytes } from "@/lib/escpos";
 import type { PosReceipt } from "@/lib/escpos";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
 import { usePosStore } from "@/store/usePosStore";
-import type { Customer, Product, ProductKind, UUID } from "@/types";
+import type {
+  Customer,
+  Product,
+  ProductInput,
+  ProductKind,
+  UUID,
+} from "@/types";
 
 /** บิลเชื่อที่ยังเก็บเงินไม่ครบ — หนึ่งแถวต่อหนึ่งแถวลูกหนี้ */
 interface OpenBill {
@@ -70,6 +83,25 @@ const CATEGORIES: ReadonlyArray<{
 const KIND_ORDER: ReadonlyArray<ProductKind> = CATEGORIES.flatMap(
   (c) => c.kinds,
 );
+
+/** เพิ่มสินค้าด่วนได้เฉพาะชนิดที่ขายหน้าร้านได้ — ของหลังร้านต้องไปทำที่หน้าสินค้า */
+const QUICK_KINDS = PRODUCT_KINDS.filter(
+  (k) => !NOT_FOR_SALE.includes(k.value),
+);
+
+const BLANK_PRODUCT: ProductInput = {
+  name: "",
+  sku: "",
+  unit: "ถัง",
+  kind: "น้ำแก๊ส",
+  size: "",
+  fill_kg: null,
+  low_at: 0,
+  price: 0,
+  cost: null,
+  active: true,
+  image_url: "",
+};
 
 /** ปุ่มบนแท็บเล็ตต้องกดง่าย — touch-manipulation กันจังหวะกดสองทีแล้วจอซูม */
 const TAP = "touch-manipulation select-none";
@@ -115,6 +147,7 @@ export function PosPage() {
   const [pickCustomer, setPickCustomer] = useState(false);
   const [clearBills, setClearBills] = useState(false);
   const [damaged, setDamaged] = useState(false);
+  const [newProduct, setNewProduct] = useState(false);
   // ข้อความลอย — เก็บ nonce ไว้ให้เตือนซ้ำข้อความเดิมแล้วนับเวลาใหม่ได้
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
@@ -374,17 +407,27 @@ export function PosPage() {
         {/* ---------- ฝั่งซ้าย: เลือกสินค้า ---------- */}
         <section className="flex min-h-0 flex-col">
           <div className="shrink-0 space-y-2.5 border-b border-line bg-card px-3 py-3">
-            <div className="relative">
-              <Search
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-              />
-              <TextInput
-                value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                placeholder="ค้นหาสินค้า…"
-                className="py-2.5 pl-9"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                />
+                <TextInput
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value)}
+                  placeholder="ค้นหาสินค้า…"
+                  className="py-2.5 pl-9"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewProduct(true)}
+                className={`${TAP} inline-flex shrink-0 items-center gap-1.5 rounded-btn border border-line px-3 py-2.5 text-sm font-medium text-ink hover:bg-paper`}
+              >
+                <PackagePlus size={16} className="shrink-0 text-accent" />
+                <span className="max-sm:sr-only">เพิ่มสินค้า</span>
+              </button>
             </div>
 
             <div className="flex gap-1.5 overflow-x-auto pb-0.5">
@@ -409,9 +452,19 @@ export function PosPage() {
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3 pb-24 lg:pb-3">
             {shown.length === 0 ? (
-              <p className="py-16 text-center text-sm text-muted">
-                ไม่พบสินค้าที่ตรงกับที่ค้นหา
-              </p>
+              <div className="py-16 text-center">
+                <p className="text-sm text-muted">
+                  ไม่พบสินค้าที่ตรงกับที่ค้นหา
+                </p>
+                <Button
+                  variant="secondary"
+                  icon={<PackagePlus size={16} />}
+                  onClick={() => setNewProduct(true)}
+                  className="mt-3"
+                >
+                  เพิ่มสินค้าใหม่
+                </Button>
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
                 {shown.map((p) => (
@@ -649,6 +702,21 @@ export function PosPage() {
 
       {damaged && <DamagedCylinderModal onClose={() => setDamaged(false)} />}
 
+      {newProduct && (
+        <QuickProductModal
+          onClose={() => setNewProduct(false)}
+          onSaved={(p) => {
+            setNewProduct(false);
+            setTerm("");
+            setCat("all");
+            setToast({
+              id: Date.now(),
+              text: `เพิ่ม “${p.name}” ขึ้นหน้าร้านแล้ว`,
+            });
+          }}
+        />
+      )}
+
       <ReceiptModal
         key={receipt?.orderId}
         receipt={receipt}
@@ -659,6 +727,176 @@ export function PosPage() {
 }
 
 /* ---------------- ชิ้นส่วนย่อย ---------------- */
+
+/** เพิ่มสินค้าด่วนจากหน้าขาย — กรอกเท่าที่จำเป็นต่อการขาย ที่เหลือไปแก้ต่อที่หน้าสินค้าได้ */
+function QuickProductModal({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: (product: Product) => void;
+}) {
+  const saveProduct = useAppStore((s) => s.saveProduct);
+  const [form, setForm] = useState<ProductInput>(BLANK_PRODUCT);
+  const [busy, setBusy] = useState(false);
+
+  const needsFillKg = GAS_FILL_KINDS.includes(form.kind ?? "");
+  const ready = !!form.name?.trim() && !busy;
+
+  async function submit() {
+    if (!ready) return;
+    setBusy(true);
+    try {
+      const saved = await saveProduct({
+        ...form,
+        name: (form.name ?? "").trim(),
+        sku: form.sku?.trim() || null,
+        size: form.size?.trim() || null,
+        unit: form.unit?.trim() || "ชิ้น",
+        fill_kg: needsFillKg ? Number(form.fill_kg) || 0 : null,
+        price: Number(form.price) || 0,
+      });
+      onSaved(saved);
+    } catch {
+      // ข้อความผิดพลาดขึ้นแถบเตือนด้านบนแล้ว — คงฟอร์มไว้ให้แก้ต่อ
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="เพิ่มสินค้าใหม่"
+      hint="จำนวนคงเหลือใส่ที่นี่ไม่ได้ — ต้องบันทึกรับเข้าที่หน้าสินค้า"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button disabled={!ready} onClick={() => void submit()}>
+            {busy ? "กำลังบันทึก…" : "บันทึก"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3.5">
+        <Field label="ชื่อสินค้า">
+          {(id) => (
+            <TextInput
+              id={id}
+              value={form.name ?? ""}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="เช่น แก๊สหุงต้ม 15 กก."
+            />
+          )}
+        </Field>
+
+        <Field
+          label="ชนิด"
+          hint={
+            needsFillKg
+              ? "ชนิดนี้ไม่มีสต๊อกของตัวเอง ขายแล้วตัดกิโลจากถังเก็บใหญ่"
+              : undefined
+          }
+        >
+          {(id) => (
+            <Select
+              id={id}
+              value={form.kind ?? ""}
+              onChange={(e) =>
+                setForm({ ...form, kind: e.target.value as ProductKind })
+              }
+            >
+              {QUICK_KINDS.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+
+        <div className="grid gap-3.5 sm:grid-cols-2">
+          <Field label="ขนาด">
+            {(id) => (
+              <TextInput
+                id={id}
+                value={form.size ?? ""}
+                onChange={(e) => setForm({ ...form, size: e.target.value })}
+                placeholder="เช่น 15kg"
+              />
+            )}
+          </Field>
+          <Field label="หน่วยนับ">
+            {(id) => (
+              <TextInput
+                id={id}
+                value={form.unit ?? ""}
+                onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                placeholder="ถัง / กก. / ชิ้น"
+              />
+            )}
+          </Field>
+        </div>
+
+        {needsFillKg && (
+          <Field
+            label="กิโลแก๊สต่อถัง"
+            hint="ใช้คำนวณว่าขาย 1 ถังแล้วต้องตัดแก๊สดิบกี่กิโล"
+          >
+            {(id) => (
+              <TextInput
+                id={id}
+                type="number"
+                inputMode="decimal"
+                value={form.fill_kg ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    fill_kg: e.target.value === "" ? null : +e.target.value,
+                  })
+                }
+                placeholder="เช่น 15"
+              />
+            )}
+          </Field>
+        )}
+
+        <div className="grid gap-3.5 sm:grid-cols-2">
+          <Field label="ราคาขาย (บาท)">
+            {(id) => (
+              <TextInput
+                id={id}
+                type="number"
+                inputMode="decimal"
+                value={form.price ?? 0}
+                onChange={(e) => setForm({ ...form, price: +e.target.value })}
+              />
+            )}
+          </Field>
+          <Field label="ต้นทุน (บาท)" hint="ไม่ใส่ก็ได้">
+            {(id) => (
+              <TextInput
+                id={id}
+                type="number"
+                inputMode="decimal"
+                value={form.cost ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    cost: e.target.value === "" ? null : +e.target.value,
+                  })
+                }
+              />
+            )}
+          </Field>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 /** เคลียร์บิลที่ลูกค้าติดไว้ โดยไม่ต้องออกจากโหมดขาย */
 function ClearBillsModal({
