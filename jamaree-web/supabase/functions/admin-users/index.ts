@@ -20,6 +20,7 @@ const ROLES = [
   "DELIVERY",
   "FILLER",
   "GENERAL",
+  "VIEWER",
 ] as const;
 type Role = (typeof ROLES)[number];
 

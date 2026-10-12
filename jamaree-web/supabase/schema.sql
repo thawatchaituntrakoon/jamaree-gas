@@ -2844,3 +2844,69 @@ grant execute on function public.add_move(uuid, text, numeric, text, text, uuid,
 
 
 
+
+-- ============================================================
+-- 18. สิทธิ์ "ผู้ดูอย่างเดียว" (เพิ่มรอบที่ 14 — รันซ้ำได้)
+--
+-- VIEWER = เปิดดูแดชบอร์ดกับสรุปยอดขายแก๊สได้อย่างเดียว แก้อะไรไม่ได้เลย
+-- กั้น 2 ชั้น: หน้าเว็บซ่อนเมนูให้ + ชั้นนี้กันที่ฐานข้อมูล
+-- ⭐ ใช้ทริกเกอร์ ไม่ใช่ RLS เพราะฟังก์ชัน security definer (complete_order,
+--    add_move, receive_po, …) ข้าม RLS ได้ แต่ข้ามทริกเกอร์ไม่ได้
+-- ============================================================
+
+alter table public.staff drop constraint if exists staff_access_role_chk;
+alter table public.staff add constraint staff_access_role_chk
+  check (access_role in (
+    'SUPER_ADMIN', 'MANAGER', 'FINANCE', 'SALES', 'DELIVERY', 'FILLER',
+    'GENERAL', 'VIEWER'
+  ));
+
+alter table public.user_profiles drop constraint if exists user_profiles_role_chk;
+alter table public.user_profiles add constraint user_profiles_role_chk
+  check (role in (
+    'SUPER_ADMIN', 'MANAGER', 'FINANCE', 'SALES', 'DELIVERY', 'FILLER',
+    'GENERAL', 'VIEWER'
+  ));
+
+comment on column public.staff.access_role is
+  'สิทธิ์เข้าใช้ระบบ — SUPER_ADMIN/MANAGER/FINANCE/SALES/DELIVERY/FILLER/GENERAL/VIEWER';
+
+create or replace function public.deny_readonly_role()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  -- ไม่มี JWT = งานเบื้องหลัง (service_role, สคริปต์, ทริกเกอร์ของระบบ) ปล่อยผ่าน
+  if auth.uid() is not null and public.my_role() = 'VIEWER' then
+    raise exception 'บัญชีนี้เป็นผู้ดูอย่างเดียว แก้ไขข้อมูลไม่ได้';
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'price_tiers', 'customers', 'products', 'stock_moves', 'orders',
+    'order_items', 'transactions', 'documents', 'cylinder_custody',
+    'money_categories', 'shop_settings', 'doc_counters', 'vendors',
+    'purchase_orders', 'staff', 'leave_types', 'timelogs', 'leaves',
+    'payrolls', 'cylinder_sizes', 'cylinder_deposits', 'price_set_items',
+    'user_profiles'
+  ]
+  loop
+    execute format('drop trigger if exists deny_readonly_trg on public.%I', t);
+    execute format(
+      'create trigger deny_readonly_trg
+         before insert or update or delete on public.%I
+         for each row execute function public.deny_readonly_role()', t
+    );
+  end loop;
+end;
+$$;

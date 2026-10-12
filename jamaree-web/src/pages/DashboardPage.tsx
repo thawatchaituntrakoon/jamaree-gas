@@ -7,6 +7,7 @@ import {
   Cylinder,
   FileText,
   Flame,
+  Gauge,
   Package,
   Scale,
   Truck,
@@ -35,7 +36,8 @@ interface StatCardProps {
   hint?: string;
   icon: ReactNode;
   tone: "accent" | "warn" | "danger" | "ok";
-  to: string;
+  /** ไม่ใส่ = การ์ดเฉย ๆ กดไม่ได้ (สิทธิ์ที่เปิดหน้าปลายทางไม่ได้) */
+  to?: string;
 }
 
 const TONES = {
@@ -46,17 +48,22 @@ const TONES = {
 } as const;
 
 function StatCard({ label, value, hint, icon, tone, to }: StatCardProps) {
-  return (
-    <Link
-      to={to}
-      className="rounded-card border border-line bg-card p-4 shadow-card transition-shadow hover:shadow-pop"
-    >
+  const body = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm text-muted">{label}</p>
         <span className={`rounded-btn p-1.5 ${TONES[tone]}`}>{icon}</span>
       </div>
       <p className="mt-2 font-head text-2xl font-semibold text-ink">{value}</p>
       <p className="mt-0.5 text-xs text-muted">{hint ?? "\u00a0"}</p>
+    </>
+  );
+  const box = "rounded-card border border-line bg-card p-4 shadow-card";
+
+  if (!to) return <div className={box}>{body}</div>;
+  return (
+    <Link to={to} className={`${box} transition-shadow hover:shadow-pop`}>
+      {body}
     </Link>
   );
 }
@@ -104,6 +111,7 @@ export function DashboardPage() {
     activeStaff,
     cylinderTotals,
     gasKgSold,
+    rawGasKg,
     stockValue,
     monthIn,
     monthOut,
@@ -118,6 +126,35 @@ export function DashboardPage() {
   const canSeeMoney = roleAllowed(role, MONEY_ROLES);
 
   const hasAnything = customers.length > 0 || orders.length > 0;
+
+  // ผู้ดูอย่างเดียว: เห็นแค่ยอดขายแก๊สกับแก๊สที่เหลือ — ไม่มีลิงก์ไปหน้าอื่นเพราะเปิดไม่ได้อยู่แล้ว
+  if (role === "VIEWER") {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <StatCard
+          label="แก๊สที่ขายวันนี้"
+          value={`${fmtQty(gasKgSold.today)} กก.`}
+          hint={`เฉลี่ยวันละ ${fmtQty(gasKgSold.avgPerDay)} กก. เดือนนี้`}
+          icon={<Flame size={17} />}
+          tone="accent"
+        />
+        <StatCard
+          label="แก๊สที่ขายเดือนนี้"
+          value={`${fmtQty(gasKgSold.month)} กก.`}
+          hint="นับเฉพาะบิลที่ปิดแล้ว"
+          icon={<CalendarDays size={17} />}
+          tone="accent"
+        />
+        <StatCard
+          label="แก๊สคงเหลือ (น้ำแก๊ส)"
+          value={`${fmtQty(rawGasKg)} กก.`}
+          hint="ในถังเก็บใหญ่"
+          icon={<Gauge size={17} />}
+          tone={rawGasKg > 0 ? "ok" : "danger"}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

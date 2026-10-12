@@ -19,6 +19,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { AccessRole } from "@/types";
 
+/** ทุกสิทธิ์ที่เป็น "คนทำงาน" — ไม่รวม VIEWER ที่เข้ามาดูตัวเลขอย่างเดียว ไม่ต้องตอกบัตร */
 const ALL: readonly AccessRole[] = [
   "SUPER_ADMIN",
   "MANAGER",
@@ -60,14 +61,15 @@ export const NAV_GROUPS: NavGroup[] = [
         path: "/",
         icon: LayoutDashboard,
         // รวมยอดเงินทั้งร้าน — สูงกว่าระดับการเงินเท่านั้นถึงเปิดได้ · คนอื่นเด้งไป landingPathFor()
-        roles: BOSS,
+        // VIEWER เข้าได้ แต่หน้าจะตัดเหลือเฉพาะตัวเลขแก๊ส ไม่มีตัวเงินสักตัว
+        roles: [...BOSS, "VIEWER"],
       },
       {
         key: "reports",
         label: "สรุปยอด",
         path: "/reports",
         icon: BarChart3,
-        roles: ["SUPER_ADMIN", "MANAGER", "FINANCE"],
+        roles: ["SUPER_ADMIN", "MANAGER", "FINANCE", "VIEWER"],
       },
     ],
   },

@@ -5,10 +5,11 @@ import { Package, Printer } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, Section } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { fmtBaht } from "@/lib/constants";
+import { fmtBaht, fmtDate, fmtQty } from "@/lib/constants";
 import { useChartTheme } from "@/lib/chartTheme";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
+import { useAuthStore } from "@/store/useAuthStore";
 
 /** เดือนปัจจุบันในรูปแบบ YYYY-MM */
 function thisPeriod() {
@@ -66,9 +67,11 @@ function Row({
 }
 
 export function ReportsPage() {
-  const { transactions, stockValue, depositHeld } = useDerived();
+  const { transactions, stockValue, depositHeld, gasKgDaily, rawGasKg } =
+    useDerived();
   const payrolls = useAppStore((s) => s.payrolls);
   const theme = useChartTheme();
+  const role = useAuthStore((s) => s.simulatedRole ?? s.role);
 
   const [period, setPeriod] = useState(thisPeriod());
   const [cashOnly, setCashOnly] = useState(false);
@@ -190,28 +193,109 @@ export function ReportsPage() {
 
   const hasTrend = trend.some((r) => Number(r[1]) > 0 || Number(r[2]) > 0);
 
+  /** ยอดขายแก๊สของเดือนที่เลือก — ใช้กับมุมมองผู้ดูอย่างเดียว */
+  const gasReport = useMemo(() => {
+    const days = gasKgDaily.filter((d) => d.date.startsWith(period));
+    const total = days.reduce((sum, d) => sum + d.kg, 0);
+    return { days, total, avgPerDay: days.length ? total / days.length : 0 };
+  }, [gasKgDaily, period]);
+
+  const periodPicker = (
+    <div className="flex items-center gap-2">
+      <input
+        type="month"
+        value={period}
+        onChange={(e) => setPeriod(e.target.value || thisPeriod())}
+        className="rounded-btn border border-line bg-card px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+      />
+      <Button
+        variant="secondary"
+        icon={<Printer size={15} />}
+        onClick={() => window.print()}
+      >
+        พิมพ์
+      </Button>
+    </div>
+  );
+
+  // ผู้ดูอย่างเดียว: เห็นเฉพาะยอดขายแก๊สกับแก๊สคงเหลือ ไม่มีตัวเลขเงินสักตัว
+  if (role === "VIEWER") {
+    return (
+      <>
+        <PageHeader
+          title="สรุปยอดขายแก๊ส"
+          hint={`ขายออกไปกี่กิโล และเหลือในถังเก็บใหญ่เท่าไหร่ — ${periodLabel(period)}`}
+          action={periodPicker}
+        />
+
+        <div className="print-area space-y-5">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Card className="p-4">
+              <p className="text-sm text-muted">
+                ขายทั้งเดือน {periodLabel(period)}
+              </p>
+              <p className="mt-1 font-head text-2xl font-semibold text-ink tabular-nums">
+                {fmtQty(gasReport.total)} กก.
+              </p>
+              <p className="mt-0.5 text-xs text-muted">นับเฉพาะบิลที่ปิดแล้ว</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-sm text-muted">เฉลี่ยต่อวันที่มีการขาย</p>
+              <p className="mt-1 font-head text-2xl font-semibold text-ink tabular-nums">
+                {fmtQty(gasReport.avgPerDay)} กก.
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                ขายไป {gasReport.days.length} วันในเดือนนี้
+              </p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-sm text-muted">แก๊สคงเหลือ (น้ำแก๊ส)</p>
+              <p
+                className={`mt-1 font-head text-2xl font-semibold tabular-nums ${
+                  rawGasKg > 0 ? "text-ink" : "text-danger"
+                }`}
+              >
+                {fmtQty(rawGasKg)} กก.
+              </p>
+              <p className="mt-0.5 text-xs text-muted">
+                ในถังเก็บใหญ่ ณ ตอนนี้
+              </p>
+            </Card>
+          </div>
+
+          <Section title="ขายรายวัน" hint="วันล่าสุดอยู่บนสุด">
+            {gasReport.days.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm text-muted">
+                เดือนนี้ยังไม่มีบิลที่ปิดแล้ว
+              </p>
+            ) : (
+              <div className="divide-y divide-line">
+                {gasReport.days.map((d) => (
+                  <Row
+                    key={d.date}
+                    label={fmtDate(d.date)}
+                    value={`${fmtQty(d.kg)} กก.`}
+                  />
+                ))}
+                <Row
+                  label="รวมทั้งเดือน"
+                  value={`${fmtQty(gasReport.total)} กก.`}
+                  strong
+                />
+              </div>
+            )}
+          </Section>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader
         title="สรุป"
         hint="ปิดยอดประจำเดือน — ตัวเลขชุดนี้ส่งให้นักบัญชีได้เลย"
-        action={
-          <div className="flex items-center gap-2">
-            <input
-              type="month"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value || thisPeriod())}
-              className="rounded-btn border border-line bg-card px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
-            />
-            <Button
-              variant="secondary"
-              icon={<Printer size={15} />}
-              onClick={() => window.print()}
-            >
-              พิมพ์
-            </Button>
-          </div>
-        }
+        action={periodPicker}
       />
 
       <div className="print-area space-y-5">

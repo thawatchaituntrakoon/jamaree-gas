@@ -140,6 +140,11 @@ export const ACCESS_ROLES: ReadonlyArray<{
     label: "พนักงานทั่วไป",
     hint: "เข้าได้เฉพาะงานของตัวเอง",
   },
+  {
+    value: "VIEWER",
+    label: "ผู้ดูอย่างเดียว",
+    hint: "ดูได้อย่างเดียว: แก๊สที่ขายวันนี้/เดือนนี้ และแก๊สคงเหลือ — แก้อะไรไม่ได้",
+  },
 ];
 
 export function accessRoleLabel(role: AccessRole): string {

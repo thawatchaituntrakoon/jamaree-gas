@@ -303,7 +303,8 @@ export type AccessRole =
   | "SALES"
   | "DELIVERY"
   | "FILLER"
-  | "GENERAL";
+  | "GENERAL"
+  | "VIEWER";
 
 /** บัญชีเข้าระบบ — แยกจากทะเบียนพนักงาน คนที่ไม่มีบัญชีก็มีชื่อในทะเบียนได้ */
 export interface UserProfile {

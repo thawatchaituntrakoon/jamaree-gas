@@ -371,6 +371,11 @@ export function useDerived() {
       avgPerDay: gasKgMonth / Math.max(1, Number(todayISO.slice(8, 10))),
     };
 
+    /** แก๊สที่ขายรายวัน วันล่าสุดก่อน */
+    const gasKgDaily = [...gasKgByDay.entries()]
+      .map(([date, kg]) => ({ date, kg }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
     /* ---------- มูลค่าของในคลัง ---------- */
 
     /** Σ สต๊อก × ทุน — ของที่ยังไม่ได้ใส่ราคาทุนจะข้าม แล้วนับไว้เตือน */
@@ -442,6 +447,7 @@ export function useDerived() {
       cylFillKg,
       orderGasKg,
       gasKgSold,
+      gasKgDaily,
       stockValue,
       documents,
       draftDocs,
