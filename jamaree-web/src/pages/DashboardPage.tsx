@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Cylinder,
   FileText,
+  Flame,
   Package,
   Scale,
   Truck,
@@ -101,6 +102,7 @@ export function DashboardPage() {
     leaveToday,
     activeStaff,
     cylinderTotals,
+    gasKgSold,
     stockValue,
     monthIn,
     monthOut,
@@ -159,6 +161,18 @@ export function DashboardPage() {
           icon={<Cylinder size={17} />}
           tone={cylinderTotals.filled > 0 ? "ok" : "warn"}
           to="/tanks"
+        />
+        <StatCard
+          label="แก๊สที่ขายเดือนนี้"
+          value={`${fmtQty(gasKgSold.month)} กก.`}
+          hint={
+            gasKgSold.today > 0
+              ? `วันนี้ ${fmtQty(gasKgSold.today)} กก.`
+              : "วันนี้ยังไม่มีบิลปิด"
+          }
+          icon={<Flame size={17} />}
+          tone="accent"
+          to="/orders"
         />
         <StatCard
           label="ใบสั่งซื้อค้างรับ"

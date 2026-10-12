@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { GAS_FILL_KINDS, sizeKg } from "@/lib/constants";
+import { GAS_FILL_KINDS, GAS_SOLD_KINDS, sizeKg } from "@/lib/constants";
 import { useAppStore } from "@/store/useAppStore";
 import type {
   Leave,
@@ -321,6 +321,49 @@ export function useDerived() {
       { filled: 0, empty: 0, atCustomer: 0 },
     );
 
+    /* ---------- แก๊สที่ขายออกไป (กิโล) ---------- */
+
+    /** กิโลต่อถังของขนาดนั้น — ลำดับเดียวกับ cyl_fill_kg() ในฐานข้อมูล */
+    const cylFillKg = (
+      size: string | null | undefined,
+      fillKg?: number | null,
+    ): number => {
+      if (Number(fillKg) > 0) return Number(fillKg);
+      const twin = products.find(
+        (p) =>
+          p.active &&
+          GAS_FILL_KINDS.includes(p.kind) &&
+          (p.size ?? "").trim() === (size ?? "").trim() &&
+          Number(p.fill_kg) > 0,
+      );
+      return Number(twin?.fill_kg) || sizeKg(size);
+    };
+
+    /** แก๊สที่ส่งมอบให้ลูกค้าในบิลนี้ — ถังเปล่า/อุปกรณ์/บริการ ไม่นับ */
+    const orderGasKg = (order: Order) =>
+      order.items.reduce((sum, it) => {
+        const p = productById(it.product_id);
+        if (!p) return sum;
+        const qty = Number(it.qty) || 0;
+        if (p.kind === "ดิบ") return sum + qty; // ขายชั่งกิโลอยู่แล้ว
+        if (!GAS_SOLD_KINDS.includes(p.kind)) return sum;
+        return sum + qty * cylFillKg(p.size, p.fill_kg);
+      }, 0);
+
+    /** ยอดแก๊สที่ขายจริง — นับเฉพาะบิลที่ปิดแล้ว ยังไม่ปิดถือว่ายังไม่ออกจากร้าน */
+    const gasKgSold = orders.reduce(
+      (acc, o) => {
+        if (!o.stock_deducted || o.voided) return acc;
+        const kg = orderGasKg(o);
+        const date = String(o.date);
+        return {
+          today: acc.today + (date === todayISO ? kg : 0),
+          month: acc.month + (date.slice(0, 7) === thisMonth ? kg : 0),
+        };
+      },
+      { today: 0, month: 0 },
+    );
+
     /* ---------- มูลค่าของในคลัง ---------- */
 
     /** Σ สต๊อก × ทุน — ของที่ยังไม่ได้ใส่ราคาทุนจะข้าม แล้วนับไว้เตือน */
@@ -389,6 +432,9 @@ export function useDerived() {
       depositHeld,
       cylinderStock,
       cylinderTotals,
+      cylFillKg,
+      orderGasKg,
+      gasKgSold,
       stockValue,
       documents,
       draftDocs,
