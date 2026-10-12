@@ -66,6 +66,11 @@ const CATEGORIES: ReadonlyArray<{
   { key: "other", label: "อื่น ๆ", kinds: [""] },
 ];
 
+/** ลำดับโชว์สินค้า — น้ำแก๊สขายบ่อยสุด ต้องอยู่หัวแถวเสมอ แล้วไล่ตามหมวดบนแท็บ */
+const KIND_ORDER: ReadonlyArray<ProductKind> = CATEGORIES.flatMap(
+  (c) => c.kinds,
+);
+
 /** ปุ่มบนแท็บเล็ตต้องกดง่าย — touch-manipulation กันจังหวะกดสองทีแล้วจอซูม */
 const TAP = "touch-manipulation select-none";
 
@@ -139,14 +144,23 @@ export function PosPage() {
   const shown = useMemo(() => {
     const kinds = cats.find((c) => c.key === cat)?.kinds;
     const q = term.trim().toLowerCase();
-    return sellable.filter((p) => {
-      if (kinds && !kinds.includes(p.kind)) return false;
-      if (!q) return true;
-      return (
-        p.name.toLowerCase().includes(q) ||
-        (p.sku ?? "").toLowerCase().includes(q)
+    const rank = (k: ProductKind) => {
+      const i = KIND_ORDER.indexOf(k);
+      return i === -1 ? KIND_ORDER.length : i;
+    };
+    return sellable
+      .filter((p) => {
+        if (kinds && !kinds.includes(p.kind)) return false;
+        if (!q) return true;
+        return (
+          p.name.toLowerCase().includes(q) ||
+          (p.sku ?? "").toLowerCase().includes(q)
+        );
+      })
+      .sort(
+        (a, b) =>
+          rank(a.kind) - rank(b.kind) || a.name.localeCompare(b.name, "th"),
       );
-    });
   }, [sellable, cats, cat, term]);
 
   const lines = useMemo(
