@@ -15,6 +15,27 @@ export const SEARCH_MIN_CHARS = 2;
 /** โชว์ผลลัพธ์มากสุดกี่รายการ (เหมือนของเดิมใน erp.html) */
 export const SEARCH_LIMIT = 8;
 
+/** ตัดวงเล็บ ขีด จุด และช่องว่างเกิน ออกให้เหลือแต่ตัวอักษรกับตัวเลข */
+const normalize = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * เทียบคำค้นแบบแยกเป็นคำ ๆ — ต้องเจอครบทุกคำ แต่ไม่สนลำดับ
+ * พิมพ์ “ชลัท แสนอร่าม (ไปส่ง)” “ชลัท ไปส่ง” หรือเว้นวรรคเกิน ก็เจอชื่อเดียวกัน
+ */
+export function matchQuery(
+  query: string,
+  ...fields: (string | null | undefined)[]
+): boolean {
+  const words = normalize(query).split(" ").filter(Boolean);
+  if (!words.length) return true;
+  const hay = normalize(fields.filter(Boolean).join(" "));
+  return words.every((w) => hay.includes(w));
+}
+
 interface SearchSource {
   customers: Customer[];
   products: Product[];
@@ -27,11 +48,11 @@ interface SearchSource {
  * ยกแนวทางมาจาก searchResults() ใน erp.html (ขั้นต่ำ 2 ตัวอักษร, ตัดที่ 8 รายการ)
  */
 export function searchResults(q: string, src: SearchSource): SearchHit[] {
-  const term = q.trim().toLowerCase();
+  const term = q.trim();
   if (term.length < SEARCH_MIN_CHARS) return [];
 
   const has = (...parts: (string | null | undefined)[]) =>
-    parts.some((p) => p && p.toLowerCase().includes(term));
+    matchQuery(term, ...parts);
 
   const hits: SearchHit[] = [];
 

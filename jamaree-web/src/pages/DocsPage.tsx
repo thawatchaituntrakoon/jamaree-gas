@@ -28,6 +28,7 @@ import {
   todayStr,
 } from "@/lib/constants";
 import { docTypeTone, taxInvoiceProblems } from "@/lib/docMath";
+import { matchQuery } from "@/lib/search";
 import { uid } from "@/lib/uid";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
@@ -117,15 +118,11 @@ export function DocsPage() {
   }
 
   const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     return documents.filter((d) => {
       if (typeTab && d.type !== typeTab) return false;
       if (!q) return true;
-      return (
-        d.number.toLowerCase().includes(q) ||
-        customerName(d.customer_id).toLowerCase().includes(q) ||
-        (d.note ?? "").toLowerCase().includes(q)
-      );
+      return matchQuery(q, d.number, customerName(d.customer_id), d.note);
     });
   }, [documents, typeTab, query, customerName]);
 

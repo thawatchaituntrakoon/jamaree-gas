@@ -20,6 +20,7 @@ import { Field, Select, TextInput } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { fmtBaht, fmtDate, todayStr, workStageTone } from "@/lib/constants";
+import { matchQuery } from "@/lib/search";
 import { uid } from "@/lib/uid";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
@@ -97,21 +98,19 @@ export function OrdersPage() {
   const filtered = !!query.trim() || !!from || !!to;
 
   const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     return orders.filter((o) => {
       if (filter === "ค้างส่ง" && (o.stock_deducted || o.voided)) return false;
       // o.date เป็น 'YYYY-MM-DD' เทียบเป็นสตริงตรง ๆ ได้เลย
       if (from && o.date < from) return false;
       if (to && o.date > to) return false;
       if (!q) return true;
-      const hay = [
+      return matchQuery(
+        q,
         o.id.slice(0, 8),
         customerName(o.customer_id),
         ...o.items.map((it) => productById(it.product_id)?.name ?? ""),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
+      );
     });
   }, [orders, filter, query, from, to, customerName, productById]);
 

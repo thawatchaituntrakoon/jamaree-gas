@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ThaiAddressInput } from "@/components/ui/ThaiAddressInput";
 import { PERSON_TYPES, fmtBaht } from "@/lib/constants";
+import { matchQuery } from "@/lib/search";
 import { EMPTY_ADDRESS, composeAddress, parseAddress } from "@/lib/thaiAddress";
 import type { ThaiAddressParts } from "@/lib/thaiAddress";
 import { useDerived } from "@/lib/useDerived";
@@ -43,13 +44,9 @@ export function CustomersPage() {
   const addrToken = useRef(0);
 
   const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     if (!q) return customers;
-    return customers.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        (c.phone ?? "").toLowerCase().includes(q),
-    );
+    return customers.filter((c) => matchQuery(q, c.name, c.phone));
   }, [customers, query]);
 
   function openNew() {

@@ -40,6 +40,7 @@ import {
   buildThaiTestBytes,
 } from "@/lib/escposRaster";
 import type { PosReceipt } from "@/lib/escpos";
+import { matchQuery } from "@/lib/search";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
@@ -1413,12 +1414,9 @@ function CustomerPicker({
   const [term, setTerm] = useState("");
 
   const hits = useMemo(() => {
-    const q = term.trim().toLowerCase();
+    const q = term.trim();
     const list = q
-      ? customers.filter(
-          (c) =>
-            c.name.toLowerCase().includes(q) || (c.phone ?? "").includes(q),
-        )
+      ? customers.filter((c) => matchQuery(q, c.name, c.phone))
       : customers;
     return list.slice(0, 40);
   }, [customers, term]);
