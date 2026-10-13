@@ -16,9 +16,10 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
-import { Field, Select, TextInput } from "@/components/ui/Field";
+import { Field, TextInput } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 import { fmtBaht, fmtDate, todayStr, workStageTone } from "@/lib/constants";
 import { matchQuery } from "@/lib/search";
 import { uid } from "@/lib/uid";
@@ -94,6 +95,16 @@ export function OrdersPage() {
   const [transfer, setTransfer] = useState("0");
 
   const sellable = useMemo(() => products.filter((p) => p.active), [products]);
+
+  const customerOptions = useMemo(
+    () =>
+      customers.map((c) => ({
+        value: c.id,
+        label: c.name,
+        hint: c.phone ?? undefined,
+      })),
+    [customers],
+  );
 
   const filtered = !!query.trim() || !!from || !!to;
 
@@ -412,18 +423,13 @@ export function OrdersPage() {
           <div className="grid gap-3.5 sm:grid-cols-2">
             <Field label="ลูกค้า" hint={priceSetHint}>
               {(id) => (
-                <Select
+                <SearchSelect
                   id={id}
                   value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                >
-                  <option value="">ลูกค้าทั่วไป (ไม่ระบุ)</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={(v) => setCustomerId(v)}
+                  options={customerOptions}
+                  placeholder="ลูกค้าทั่วไป (ไม่ระบุ) — พิมพ์เพื่อค้นหา"
+                />
               )}
             </Field>
             <Field label="วันที่">
