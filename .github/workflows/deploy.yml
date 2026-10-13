@@ -1,96 +1,27 @@
-name: Deploy to VPS
+name: Auto Deploy to VPS
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      vps_port:
-        description: พอร์ต SSH ของ VPS (ถ้าต้องการ override ชั่วคราว)
-        required: false
-        type: string
-
-# กัน deploy ซ้อนกันถ้า push ติด ๆ กัน
-concurrency:
-  group: deploy-vps
-  cancel-in-progress: false
+    branches:
+      - main  # เปลี่ยนเป็น master ถ้าคุณใช้ branch ชื่อ master
 
 jobs:
   deploy:
-    name: Build & restart on VPS
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve SSH port
-        env:
-          INPUT_VPS_PORT: ${{ inputs.vps_port }}
-          SECRET_VPS_PORT: ${{ secrets.VPS_PORT }}
-          SECRET_VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
-          SECRET_SSH_PORT: ${{ secrets.SSH_PORT }}
-          VAR_VPS_PORT: ${{ vars.VPS_PORT }}
-          VAR_VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT }}
-          VAR_SSH_PORT: ${{ vars.SSH_PORT }}
-        run: |
-          port="${INPUT_VPS_PORT:-}"
-          source_name="workflow_dispatch input vps_port"
-
-          if [ -z "$port" ]; then
-            port="${SECRET_VPS_PORT:-}"
-            source_name="secret VPS_PORT"
-          fi
-          if [ -z "$port" ]; then
-            port="${SECRET_VPS_SSH_PORT:-}"
-            source_name="secret VPS_SSH_PORT"
-          fi
-          if [ -z "$port" ]; then
-            port="${SECRET_SSH_PORT:-}"
-            source_name="secret SSH_PORT"
-          fi
-          if [ -z "$port" ]; then
-            port="${VAR_VPS_PORT:-}"
-            source_name="variable VPS_PORT"
-          fi
-          if [ -z "$port" ]; then
-            port="${VAR_VPS_SSH_PORT:-}"
-            source_name="variable VPS_SSH_PORT"
-          fi
-          if [ -z "$port" ]; then
-            port="${VAR_SSH_PORT:-}"
-            source_name="variable SSH_PORT"
-          fi
-          if [ -z "$port" ]; then
-            port="22"
-            source_name="default 22"
-          fi
-
-          case "$port" in
-            ''|*[!0-9]*)
-              echo "::error::Resolved SSH port must be a number. Configure vps_port, VPS_PORT, VPS_SSH_PORT, or SSH_PORT."
-              exit 1
-              ;;
-          esac
-
-          if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
-            echo "::error::Resolved SSH port must be between 1 and 65535."
-            exit 1
-          fi
-
-          echo "DEPLOY_SSH_PORT=$port" >> "$GITHUB_ENV"
-          echo "Resolved SSH port source: $source_name"
-
-      - name: SSH into VPS and redeploy
+      - name: SSH into VPS and Deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}
+          host: ${{ secrets.VPS_IP }}
           username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ env.DEPLOY_SSH_PORT }}
-          script_stop: true
+          key: ${{ secrets.VPS_PRIVATE_KEY }}
           script: |
-            set -e
-            cd /root/jamaree-gas-admin
+            # ระบุตำแหน่งโฟลเดอร์โปรเจกต์ของคุณใน VPS
+            cd /root/jamaree-gas
+            
+            # ดึงโค้ดล่าสุด
             git pull origin main
-            cd jamaree-web
-            # คีย์ Supabase ต้องมีตอน build (Vite ฝังค่าลงไฟล์ตอนสร้าง)
-            docker compose --env-file .env.local up -d --build
-            docker image prune -f
-            docker compose ps
+            
+            # สั่ง Build และรัน Docker ใหม่
+            docker compose down
+            docker compose up -d --build
