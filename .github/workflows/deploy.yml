@@ -17,7 +17,7 @@ jobs:
           key: ${{ secrets.VPS_PRIVATE_KEY }}
           script: |
             # ระบุตำแหน่งโฟลเดอร์โปรเจกต์ของคุณใน VPS
-            cd /root/jamaree-gas
+            cd /root/jamaree-gas/jamaree-web/
             
             # ดึงโค้ดล่าสุด
             git pull origin main
