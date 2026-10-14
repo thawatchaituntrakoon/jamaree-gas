@@ -5,7 +5,7 @@ import { Package, Printer } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, Section } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { fmtBaht, fmtDate, fmtQty } from "@/lib/constants";
+import { fmtBaht, fmtDate, fmtQty, todayStr } from "@/lib/constants";
 import { useChartTheme } from "@/lib/chartTheme";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
@@ -67,14 +67,50 @@ function Row({
 }
 
 export function ReportsPage() {
-  const { transactions, stockValue, depositHeld, gasKgDaily, rawGasKg } =
-    useDerived();
+  const {
+    transactions,
+    stockValue,
+    depositHeld,
+    gasKgDaily,
+    rawGasKg,
+    orders,
+    orderTotal,
+    customerName,
+  } = useDerived();
   const payrolls = useAppStore((s) => s.payrolls);
   const theme = useChartTheme();
   const role = useAuthStore((s) => s.simulatedRole ?? s.role);
 
   const [period, setPeriod] = useState(thisPeriod());
+  const [day, setDay] = useState(todayStr());
   const [cashOnly, setCashOnly] = useState(false);
+
+  /** บิลของวันที่เลือก รวมเป็นรายลูกค้า — บิลที่ยกเลิกไม่นับ */
+  const dayBills = useMemo(() => {
+    const list = orders.filter((o) => o.date === day && !o.voided);
+    const map = new Map<
+      string,
+      { id: string | null; name: string; bills: number; amount: number }
+    >();
+    for (const o of list) {
+      const key = o.customer_id ?? "";
+      const row = map.get(key) ?? {
+        id: o.customer_id,
+        name: o.customer_id ? customerName(o.customer_id) : "ลูกค้าทั่วไป",
+        bills: 0,
+        amount: 0,
+      };
+      row.bills += 1;
+      row.amount += orderTotal(o);
+      map.set(key, row);
+    }
+    const rows = [...map.values()].sort((a, b) => b.amount - a.amount);
+    return {
+      rows,
+      bills: list.length,
+      total: rows.reduce((sum, r) => sum + r.amount, 0),
+    };
+  }, [orders, day, customerName, orderTotal]);
 
   const data = useMemo(() => {
     const inMonth = transactions.filter((t) => {
@@ -338,6 +374,47 @@ export function ReportsPage() {
             </p>
           </Card>
         </div>
+
+        <Section
+          title="บิลรายวัน แยกตามลูกค้า"
+          hint={
+            dayBills.bills
+              ? `${fmtDate(day)} — ลูกค้า ${dayBills.rows.length} ราย · ${dayBills.bills} บิล`
+              : `${fmtDate(day)} — ยังไม่มีบิล`
+          }
+          action={
+            <input
+              type="date"
+              value={day}
+              onChange={(e) => setDay(e.target.value || todayStr())}
+              aria-label="เลือกวันที่"
+              className="rounded-btn border border-line bg-card px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+            />
+          }
+        >
+          {dayBills.rows.length === 0 ? (
+            <p className="px-4 py-10 text-center text-sm text-muted">
+              วันนี้ยังไม่มีบิล ลองเลือกวันอื่นดู
+            </p>
+          ) : (
+            <div className="divide-y divide-line">
+              {dayBills.rows.map((r) => (
+                <Row
+                  key={r.id ?? "walkin"}
+                  label={r.name}
+                  hint={`${r.bills} บิล`}
+                  value={fmtBaht(r.amount)}
+                />
+              ))}
+              <Row
+                label={`รวม ${dayBills.rows.length} ราย`}
+                hint={`${dayBills.bills} บิล`}
+                value={fmtBaht(dayBills.total)}
+                strong
+              />
+            </div>
+          )}
+        </Section>
 
         <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-ink">
           <input

@@ -46,6 +46,9 @@ export type WorkStage = "ใหม่" | "กำลังทำ" | "ส่งแ
 
 export type MoneyType = "เข้า" | "ออก";
 
+/** รับ/จ่ายด้วยอะไร */
+export type PayMethod = "เงินสด" | "เงินโอน";
+
 /** ที่มาของรายการเงิน/การเคลื่อนไหว — ถ้ามีค่า แปลว่าระบบสร้างให้อัตโนมัติ ห้ามลบมือ */
 export type RefType = "order" | "doc" | "po" | "payroll" | "custody";
 
@@ -169,6 +172,8 @@ export interface Transaction {
   unpaid: boolean;
   /** วันที่เก็บ/จ่ายเงินจริง */
   settled_at: ISODate | null;
+  /** รับ/จ่ายเป็นเงินสดหรือเงินโอน */
+  pay_method: PayMethod | null;
   ref_type: RefType | null;
   ref_id: UUID | null;
   vat_amt: number | null;

@@ -28,6 +28,7 @@ import type {
   PriceSetInput,
   PriceSetItem,
   PriceSetItemInput,
+  PayMethod,
   Payroll,
   PayrollRow,
   Product,
@@ -114,6 +115,7 @@ interface AppState {
     id: UUID,
     amount?: number,
     date?: string,
+    method?: PayMethod,
   ) => Promise<void>;
   saveCategory: (
     input: MoneyCategoryInput,
@@ -665,11 +667,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) }));
   },
 
-  settleTransaction: async (id, amount, date) => {
+  settleTransaction: async (id, amount, date, method) => {
     const { error } = await supabase.rpc("settle_transaction", {
       p_txn_id: id,
       p_amount: amount ?? null,
       p_date: date ?? null,
+      p_method: method ?? null,
     });
     if (error) {
       set({ error: toMessage(error) });

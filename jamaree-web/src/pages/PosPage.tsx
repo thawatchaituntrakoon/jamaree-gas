@@ -21,6 +21,7 @@ import {
 import { DamagedCylinderModal } from "@/components/pos/DamagedCylinderModal";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { PayMethodPicker } from "@/components/ui/PayMethodPicker";
 import { ProductThumb } from "@/components/ui/ProductThumb";
 import { Field, Select, TextInput } from "@/components/ui/Field";
 import {
@@ -47,6 +48,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { usePosStore } from "@/store/usePosStore";
 import type {
   Customer,
+  PayMethod,
   Product,
   ProductInput,
   ProductKind,
@@ -943,18 +945,22 @@ function ClearBillsModal({
 }: {
   bills: OpenBill[];
   onClose: () => void;
-  onSettle: (id: UUID, amount?: number, date?: string) => Promise<void>;
+  onSettle: (
+    id: UUID,
+    amount?: number,
+    date?: string,
+    method?: PayMethod,
+  ) => Promise<void>;
 }) {
   const [term, setTerm] = useState("");
   const [picked, setPicked] = useState<OpenBill | null>(null);
   const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<PayMethod>("เงินสด");
   const [busy, setBusy] = useState(false);
 
   const shown = useMemo(() => {
-    const q = term.trim().toLowerCase();
-    return q
-      ? bills.filter((b) => b.customer.toLowerCase().includes(q))
-      : bills;
+    const q = term.trim();
+    return q ? bills.filter((b) => matchQuery(q, b.customer)) : bills;
   }, [bills, term]);
 
   const total = bills.reduce((sum, b) => sum + b.amount, 0);
@@ -964,13 +970,14 @@ function ClearBillsModal({
   function pick(bill: OpenBill) {
     setPicked(bill);
     setAmount(String(bill.amount));
+    setMethod("เงินสด");
   }
 
   async function submit() {
     if (!picked || !(paying > 0) || overpay) return;
     setBusy(true);
     try {
-      await onSettle(picked.txnId, paying, todayStr());
+      await onSettle(picked.txnId, paying, todayStr(), method);
       setPicked(null);
       setAmount("");
     } catch {
@@ -1039,6 +1046,11 @@ function ClearBillsModal({
               className="py-3 text-right font-head text-xl"
             />
           </label>
+
+          <div>
+            <span className="mb-1 block text-sm text-muted">รับเป็น</span>
+            <PayMethodPicker big value={method} onChange={setMethod} />
+          </div>
 
           {overpay ? (
             <p className="rounded-btn bg-danger-soft px-3 py-2.5 text-sm text-danger">

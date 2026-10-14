@@ -18,6 +18,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PayMethodPicker } from "@/components/ui/PayMethodPicker";
 import {
   PERSON_TYPES,
   VAT_RATE,
@@ -31,6 +32,7 @@ import { useAppStore } from "@/store/useAppStore";
 import type {
   MoneyCategory,
   MoneyType,
+  PayMethod,
   PersonType,
   Transaction,
 } from "@/types";
@@ -154,6 +156,7 @@ export function MoneyPage() {
   const [settleFor, setSettleFor] = useState<Transaction | null>(null);
   const [settleAmount, setSettleAmount] = useState("");
   const [settleDate, setSettleDate] = useState(todayStr());
+  const [settleMethod, setSettleMethod] = useState<PayMethod>("เงินสด");
 
   const [deleteFor, setDeleteFor] = useState<Transaction | null>(null);
 
@@ -259,6 +262,7 @@ export function MoneyPage() {
     setSettleFor(t);
     setSettleAmount(String(t.amount));
     setSettleDate(todayStr());
+    setSettleMethod("เงินสด");
   }
 
   async function submitSettle() {
@@ -267,7 +271,7 @@ export function MoneyPage() {
     if (!(amt > 0)) return;
     setBusy(true);
     try {
-      await settleTransaction(settleFor.id, amt, settleDate);
+      await settleTransaction(settleFor.id, amt, settleDate, settleMethod);
       setSettleFor(null);
     } catch {
       // ข้อความผิดพลาดโชว์บนแถบเตือนด้านบนแล้ว
@@ -503,6 +507,7 @@ export function MoneyPage() {
                     <p className="text-xs text-muted">
                       {[
                         t.category ?? "ไม่ระบุหมวด",
+                        t.pay_method,
                         t.payee_name,
                         t.ref_type ? REF_LABEL[t.ref_type] : null,
                       ]
@@ -872,6 +877,16 @@ export function MoneyPage() {
                   />
                 )}
               </Field>
+            </div>
+
+            <div>
+              <p className="mb-1 text-sm font-medium text-ink">
+                {settleFor.type === "เข้า" ? "รับเป็น" : "จ่ายเป็น"}
+              </p>
+              <PayMethodPicker
+                value={settleMethod}
+                onChange={setSettleMethod}
+              />
             </div>
           </div>
         )}

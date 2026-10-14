@@ -2910,3 +2910,91 @@ begin
   end loop;
 end;
 $$;
+
+-- ============================================================
+-- 19. รับ/จ่ายเป็นเงินสดหรือเงินโอน (เพิ่มรอบที่ 15 — รันซ้ำได้)
+--
+-- ตอนเก็บเงินลูกหนี้หรือจ่ายเจ้าหนี้ ต้องรู้ว่าเงินเข้ากระเป๋าไหน
+-- settle_transaction เลยรับพารามิเตอร์เพิ่มอีกตัว — ต้อง drop ตัวเดิมก่อน
+-- ไม่งั้นเรียกแบบ 3 พารามิเตอร์จะกำกวมว่าหมายถึงตัวไหน
+-- ============================================================
+
+alter table public.transactions add column if not exists pay_method text;
+alter table public.transactions drop constraint if exists transactions_pay_method_chk;
+alter table public.transactions add constraint transactions_pay_method_chk
+  check (pay_method is null or pay_method in ('เงินสด', 'เงินโอน'));
+
+comment on column public.transactions.pay_method is
+  'รับ/จ่ายเป็นเงินสดหรือเงินโอน — ว่างได้ถ้าเป็นรายการเก่าหรือยังไม่ได้ตัดยอด';
+
+drop function if exists public.settle_transaction(uuid, numeric, date);
+
+create or replace function public.settle_transaction(
+  p_txn_id uuid,
+  p_amount numeric default null,
+  p_date   date    default null,
+  p_method text    default null
+)
+returns public.transactions
+security definer
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_row  public.transactions;
+  v_out  public.transactions;
+  v_pay  numeric;
+  v_when date := coalesce(p_date, current_date);
+begin
+  if auth.uid() is null then
+    raise exception 'ต้องเข้าสู่ระบบก่อน';
+  end if;
+
+  select * into v_row from public.transactions where id = p_txn_id for update;
+  if not found then
+    raise exception 'ไม่พบรายการเงินที่ต้องการ';
+  end if;
+  if not v_row.unpaid then
+    raise exception 'รายการนี้ตัดยอดไปแล้ว';
+  end if;
+
+  v_pay := coalesce(p_amount, v_row.amount);
+  if v_pay <= 0 then
+    raise exception 'จำนวนเงินต้องมากกว่า 0';
+  end if;
+  if v_pay > v_row.amount then
+    raise exception 'มากกว่ายอดค้าง (ค้างอยู่ % บาท)', trim_scale(v_row.amount);
+  end if;
+
+  if v_pay = v_row.amount then
+    update public.transactions
+       set unpaid = false, settled_at = v_when, pay_method = p_method
+     where id = p_txn_id
+     returning * into v_out;
+  else
+    update public.transactions
+       set amount = amount - v_pay
+     where id = p_txn_id;
+
+    insert into public.transactions (
+      date, type, amount, note, category, unpaid, settled_at, pay_method,
+      ref_type, ref_id, payee_name, payee_tax_id, payee_person_type
+    )
+    values (
+      v_when, v_row.type, v_pay,
+      v_row.note || case when v_row.type = 'เข้า'
+                         then ' (รับชำระบางส่วน)'
+                         else ' (จ่ายบางส่วน)' end,
+      v_row.category, false, v_when, p_method,
+      v_row.ref_type, v_row.ref_id,
+      v_row.payee_name, v_row.payee_tax_id, v_row.payee_person_type
+    )
+    returning * into v_out;
+  end if;
+
+  return v_out;
+end;
+$$;
+
+revoke all on function public.settle_transaction(uuid, numeric, date, text) from public, anon;
+grant execute on function public.settle_transaction(uuid, numeric, date, text) to authenticated;
