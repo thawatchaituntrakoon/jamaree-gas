@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Ban, Check, ChevronRight, Printer } from "lucide-react";
+import { AlertTriangle, Ban, Check, ChevronRight, Printer } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { OrderPairPrintTemplate } from "@/components/print/OrderPairPrintTemplate";
 import { OrderPrintTemplate } from "@/components/print/OrderPrintTemplate";
@@ -18,6 +18,11 @@ import {
 } from "@/lib/constants";
 import { useDerived } from "@/lib/useDerived";
 import { useAppStore } from "@/store/useAppStore";
+import { roleAllowed, useAuthStore } from "@/store/useAuthStore";
+import type { AccessRole } from "@/types";
+
+/** ยกเลิกบิลที่ตัดสต๊อกไปแล้ว = คืนของเข้าคลัง + ลบเงินออกจากบัญชี — จำกัดไว้ที่หัวหน้า */
+const VOID_ROLES: readonly AccessRole[] = ["SUPER_ADMIN", "MANAGER"];
 
 /** แถบไทม์ไลน์งาน — แสดงผลอย่างเดียว ไม่เกี่ยวกับการตัดสต๊อก */
 function Timeline({ current }: { current: string }) {
@@ -70,6 +75,10 @@ export function OrderDetailPage() {
 
   const [busy, setBusy] = useState(false);
   const [confirmVoid, setConfirmVoid] = useState(false);
+  // แถบเตือนด้านบนถูกกล่องยืนยันบังอยู่ — ต้องโชว์เหตุผลที่ยกเลิกไม่ได้ในกล่องเอง
+  const [voidError, setVoidError] = useState<string | null>(null);
+  const role = useAuthStore((s) => s.simulatedRole ?? s.role);
+  const canVoidPosted = roleAllowed(role, VOID_ROLES);
 
   const order = orders.find((o) => o.id === id);
 
@@ -183,14 +192,19 @@ export function OrderDetailPage() {
                     {busy ? "กำลังปิดบิล…" : "ปิดบิล & ตัดสต๊อก"}
                   </Button>
                 )}
-                <Button
-                  variant="danger"
-                  icon={<Ban size={15} />}
-                  disabled={busy}
-                  onClick={() => setConfirmVoid(true)}
-                >
-                  ยกเลิกบิล
-                </Button>
+                {!order.voided && (!order.stock_deducted || canVoidPosted) && (
+                  <Button
+                    variant="danger"
+                    icon={<Ban size={15} />}
+                    disabled={busy}
+                    onClick={() => {
+                      setVoidError(null);
+                      setConfirmVoid(true);
+                    }}
+                  >
+                    ยกเลิกบิล
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -325,8 +339,19 @@ export function OrderDetailPage() {
               variant="danger"
               disabled={busy}
               onClick={async () => {
-                await run(() => voidOrder(order.id));
-                setConfirmVoid(false);
+                setBusy(true);
+                setVoidError(null);
+                try {
+                  await voidOrder(order.id);
+                  setConfirmVoid(false);
+                } catch {
+                  setVoidError(
+                    useAppStore.getState().error ??
+                      "ยกเลิกบิลไม่สำเร็จ ลองใหม่อีกครั้ง",
+                  );
+                } finally {
+                  setBusy(false);
+                }
               }}
             >
               {busy ? "กำลังยกเลิก…" : "ยืนยันยกเลิกบิล"}
@@ -342,6 +367,15 @@ export function OrderDetailPage() {
         <p className="mt-2 text-sm text-muted">
           ตัวบิลจะยังอยู่ในประวัติ แค่ถูกทำเครื่องหมายว่ายกเลิกแล้ว
         </p>
+        {voidError && (
+          <div className="mt-3 flex items-start gap-2.5 rounded-card border border-danger/30 bg-danger-soft p-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-danger" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium text-danger">ยกเลิกบิลไม่สำเร็จ</p>
+              <p className="mt-0.5 text-ink">{voidError}</p>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* กระดาษ A4 รอพิมพ์ — ซ่อนนอกจอแทน display:none เพราะ clone ที่ถูกซ่อนจะออกกระดาษเปล่า */}

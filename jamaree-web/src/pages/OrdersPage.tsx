@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
 import {
+  AlertTriangle,
   Ban,
   Eye,
   Pencil,
@@ -28,10 +29,23 @@ import { useAppStore } from "@/store/useAppStore";
 import { roleAllowed, useAuthStore } from "@/store/useAuthStore";
 import type { AccessRole, Order, OrderItemInput, UUID } from "@/types";
 
-type Filter = "ค้างส่ง" | "ทั้งหมด";
+type Filter = "ค้างส่ง" | "ทั้งหมด" | "ยกเลิกแล้ว";
+
+/** แถบกรองด้านบนตาราง — "ทั้งหมด" = บิลที่ยังใช้งานอยู่ ส่วนบิลที่ยกเลิกแล้วแยกไปอีกแถบ */
+const FILTERS: readonly Filter[] = ["ค้างส่ง", "ทั้งหมด", "ยกเลิกแล้ว"];
 
 /** ยกเลิกบิลที่ตัดสต๊อกไปแล้ว = คืนของเข้าคลัง + ลบเงินออกจากบัญชี — จำกัดไว้ที่หัวหน้า */
 const VOID_ROLES: readonly AccessRole[] = ["SUPER_ADMIN", "MANAGER"];
+
+/**
+ * ยกเลิกบิลใบนี้ได้ไหม
+ * บิลร่าง (ยังไม่ตัดสต๊อก) ยกเลิกได้เลย ไม่กระทบสต๊อก/บัญชี
+ * ส่วนบิลที่ปิดแล้วต้องคืนของ + ลบเงิน เลยจำกัดไว้ที่หัวหน้าเท่านั้น
+ */
+function voidable(o: Order, canVoidPosted: boolean): boolean {
+  if (o.voided) return false;
+  return o.stock_deducted ? canVoidPosted : true;
+}
 
 interface DraftItem extends OrderItemInput {
   /** คีย์ชั่วคราวสำหรับ React เท่านั้น ไม่ได้บันทึกลงฐานข้อมูล */
@@ -67,6 +81,8 @@ export function OrdersPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Order | null>(null);
   const [voidFor, setVoidFor] = useState<Order | null>(null);
+  // ข้อความผิดพลาดตอนยกเลิกบิล — ต้องโชว์ในกล่องนี้เอง เพราะแถบเตือนด้านบนถูก modal บังไว้
+  const [voidError, setVoidError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // พิมพ์ใบส่งของ+บิลคู่กันบนกระดาษ A4 แผ่นเดียว — n ไว้บังคับให้พิมพ์ซ้ำบิลเดิมได้
@@ -108,10 +124,21 @@ export function OrdersPage() {
 
   const filtered = !!query.trim() || !!from || !!to;
 
+  const voidedCount = useMemo(
+    () => orders.filter((o) => o.voided).length,
+    [orders],
+  );
+
   const rows = useMemo(() => {
     const q = query.trim();
     return orders.filter((o) => {
-      if (filter === "ค้างส่ง" && (o.stock_deducted || o.voided)) return false;
+      // บิลที่ยกเลิกแล้วมีแถบของตัวเอง — กดยกเลิกเสร็จต้องหายออกจากรายการที่ใช้งานอยู่ทันที
+      if (filter === "ยกเลิกแล้ว") {
+        if (!o.voided) return false;
+      } else if (o.voided) {
+        return false;
+      }
+      if (filter === "ค้างส่ง" && o.stock_deducted) return false;
       // o.date เป็น 'YYYY-MM-DD' เทียบเป็นสตริงตรง ๆ ได้เลย
       if (from && o.date < from) return false;
       if (to && o.date > to) return false;
@@ -201,14 +228,23 @@ export function OrdersPage() {
     }
   }
 
+  function askVoid(o: Order) {
+    setVoidError(null);
+    setVoidFor(o);
+  }
+
   async function submitVoid() {
     if (!voidFor) return;
     setBusy(true);
+    setVoidError(null);
     try {
       await voidOrder(voidFor.id);
       setVoidFor(null);
     } catch {
-      // ข้อความผิดพลาดโชว์บนแถบเตือนด้านบนแล้ว
+      // แถบเตือนด้านบนถูกกล่องนี้บังอยู่ — ดึงข้อความมาโชว์ตรงนี้ให้เห็นว่าทำไมยกเลิกไม่ได้
+      setVoidError(
+        useAppStore.getState().error ?? "ยกเลิกบิลไม่สำเร็จ ลองใหม่อีกครั้ง",
+      );
     } finally {
       setBusy(false);
     }
@@ -229,7 +265,7 @@ export function OrdersPage() {
       <Card>
         <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
           <div className="flex gap-1">
-            {(["ค้างส่ง", "ทั้งหมด"] as Filter[]).map((f) => (
+            {FILTERS.map((f) => (
               <button
                 key={f}
                 type="button"
@@ -237,11 +273,14 @@ export function OrdersPage() {
                 className={[
                   "rounded-btn px-3 py-1.5 text-sm font-medium transition-colors",
                   filter === f
-                    ? "bg-accent-soft text-accent"
+                    ? f === "ยกเลิกแล้ว"
+                      ? "bg-danger-soft text-danger"
+                      : "bg-accent-soft text-accent"
                     : "text-muted hover:bg-paper",
                 ].join(" ")}
               >
                 {f}
+                {f === "ยกเลิกแล้ว" && voidedCount > 0 && ` (${voidedCount})`}
               </button>
             ))}
           </div>
@@ -300,7 +339,11 @@ export function OrdersPage() {
               ? "ยังไม่มีบิล กดปุ่ม “เปิดบิลใหม่” เพื่อขายชิ้นแรก"
               : filtered
                 ? "ไม่พบบิลตามเงื่อนไขที่ค้นหา"
-                : "ไม่มีบิลค้างส่ง สบายใจได้"
+                : filter === "ยกเลิกแล้ว"
+                  ? "ยังไม่มีบิลที่ถูกยกเลิก"
+                  : filter === "ทั้งหมด"
+                    ? "ยังไม่มีบิลที่ใช้งานอยู่"
+                    : "ไม่มีบิลค้างส่ง สบายใจได้"
           }
           columns={[
             {
@@ -380,12 +423,12 @@ export function OrdersPage() {
                   >
                     พิมพ์ใบส่งของ+บิล
                   </Button>
-                  {canVoid && o.stock_deducted && !o.voided && (
+                  {voidable(o, canVoid) && (
                     <Button
                       variant="danger"
                       size="sm"
                       icon={<Ban size={14} />}
-                      onClick={() => setVoidFor(o)}
+                      onClick={() => askVoid(o)}
                     >
                       ยกเลิกบิล
                     </Button>
@@ -406,7 +449,7 @@ export function OrdersPage() {
         footer={
           <>
             <Button variant="secondary" onClick={() => setOpen(false)}>
-              ยกเลิก
+              ปิดหน้าต่าง
             </Button>
             <Button
               onClick={submit}
@@ -605,13 +648,29 @@ export function OrdersPage() {
           </>
         }
       >
-        <p className="text-sm text-ink">
-          ระบบจะ<b>คืนของเข้าสต๊อกกลับทั้งหมด</b>{" "}
-          และลบยอดเงินของบิลนี้ออกจากบัญชี
-        </p>
+        {voidFor?.stock_deducted ? (
+          <p className="text-sm text-ink">
+            ระบบจะ<b>คืนของเข้าสต๊อกกลับทั้งหมด</b>{" "}
+            และลบยอดเงินของบิลนี้ออกจากบัญชี
+          </p>
+        ) : (
+          <p className="text-sm text-ink">
+            บิลนี้<b>ยังไม่ได้ตัดสต๊อก</b> — ยกเลิกได้เลย
+            ไม่กระทบสต๊อกและบัญชี
+          </p>
+        )}
         <p className="mt-2 text-sm text-muted">
           ตัวบิลจะยังอยู่ในประวัติ แค่ถูกทำเครื่องหมายว่ายกเลิกแล้ว
         </p>
+        {voidError && (
+          <div className="mt-3 flex items-start gap-2.5 rounded-card border border-danger/30 bg-danger-soft p-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-danger" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium text-danger">ยกเลิกบิลไม่สำเร็จ</p>
+              <p className="mt-0.5 text-ink">{voidError}</p>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* กระดาษที่จะพิมพ์ — ซ่อนออกไปนอกจอ ไม่ใช่ display:none เพราะตัวพิมพ์ต้องวัดขนาดได้ */}
